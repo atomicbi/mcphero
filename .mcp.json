@@ -1,0 +1,8 @@
+{
+  "mcpServers": {
+    "mcpkit": {
+      "command": "pnpm",
+      "args": ["tsx", "test/stdio.ts"]
+    }
+  }
+}

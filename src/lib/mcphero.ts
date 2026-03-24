@@ -1,22 +1,22 @@
 import { Action } from '../util/action.js'
 import { Adapter, AdapterGenerator } from '../util/adapter.js'
 
-export interface MCPKitOptions {
+export interface MCPHeroOptions {
   name: string
   description: string
   version: string
 }
 
-export interface MCPKit {
-  with: (generator: AdapterGenerator) => MCPKit
-  mount: (action: Action) => MCPKit
-  start: () => Promise<MCPKit>
+export interface MCPHero {
+  with: (generator: AdapterGenerator) => MCPHero
+  mount: (action: Action) => MCPHero
+  start: () => Promise<MCPHero>
 }
 
-export function mcpkit(options: MCPKitOptions): MCPKit {
+export function mcphero(options: MCPHeroOptions): MCPHero {
   const adapters: Adapter[] = []
   const actions: Action[] = []
-  const instance: MCPKit = {
+  const instance: MCPHero = {
     with: (generator) => {
       adapters.push(generator(options))
       return instance

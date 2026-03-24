@@ -1,10 +1,10 @@
-import { cli } from '../src/adapter/cli'
-import { mcpkit } from '../src/lib/MCPKit'
-import { HelloAction } from './actions/HelloAction'
-import { TaskAction } from './actions/TaskAction'
+import { cli } from '../src/adapter/cli.js'
+import { mcphero } from '../src/lib/mcphero.js'
+import { HelloAction } from './actions/HelloAction.js'
+import { TaskAction } from './actions/TaskAction.js'
 
 async function main() {
-  await mcpkit({ name: 'mcpkit', description: 'MCPKit', version: '1.0.0' })
+  await mcphero({ name: 'mcphero', description: 'MCPHero', version: '1.0.0' })
     .with(cli())
     .mount(HelloAction)
     .mount(TaskAction)

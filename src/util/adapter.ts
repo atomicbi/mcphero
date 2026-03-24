@@ -1,5 +1,5 @@
-// import { MCPKitOptions } from '../lib/MCPKit.js'
-import { MCPKitOptions } from '../lib/mcpkit.js'
+// import { MCPHeroOptions } from '../lib/MCPHero.js'
+import { MCPHeroOptions } from '../lib/mcphero.js'
 import { Action } from './action.js'
 
 export interface Adapter {
@@ -7,6 +7,6 @@ export interface Adapter {
   stop(): Promise<void>
 }
 
-export type AdapterGenerator = (options: MCPKitOptions) => Adapter
+export type AdapterGenerator = (options: MCPHeroOptions) => Adapter
 
 export type AdapterFactory<T = void> = (options: T) => AdapterGenerator

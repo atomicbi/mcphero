@@ -1,9 +1,9 @@
 {
-  "name": "mcpkit",
+  "name": "mcphero",
   "version": "1.0.0",
-  "description": "MCP Toolkit",
+  "description": "MCP Hero Toolkit",
   "bin": {
-    "mcpkit": "build/cli.js"
+    "mcphero": "build/cli.js"
   },
   "type": "module",
   "main": "build/index.js",

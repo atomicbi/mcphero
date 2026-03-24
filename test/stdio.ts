@@ -1,10 +1,10 @@
-import { stdio } from '../src/adapter/stdio'
-import { mcpkit } from '../src/lib/MCPKit'
-import { HelloAction } from './actions/HelloAction'
-import { TaskAction } from './actions/TaskAction'
+import { stdio } from '../src/adapter/stdio.js'
+import { mcphero } from '../src/index.js'
+import { HelloAction } from './actions/HelloAction.js'
+import { TaskAction } from './actions/TaskAction.js'
 
 async function main() {
-  await mcpkit({ name: 'mcpkit', description: 'MCPKit', version: '1.0.0' })
+  await mcphero({ name: 'mcphero', description: 'MCPHero', version: '1.0.0' })
     .with(stdio())
     .mount(HelloAction)
     .mount(TaskAction)

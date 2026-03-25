@@ -3,7 +3,7 @@ import { createAction } from '../../src/util/action.js'
 
 export const TaskAction = createAction({
   name: 'task',
-  description: 'Execute a long-running tark',
+  description: 'Execute a long-running task',
   input: z.object({
     stepCount: z.number().int().min(1).max(10).describe('Number of steps to execute').default(5),
     stepDuration: z.number().int().min(1000).max(10000).describe('Time duration per step').default(1000)

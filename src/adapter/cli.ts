@@ -1,9 +1,10 @@
-import { intro, log } from '@clack/prompts'
+import { intro } from '@clack/prompts'
 import { camelCase, kebabCase } from 'change-case'
 import { Command } from 'commander'
 import z from 'zod'
 import { ActionContext } from '../util/action.js'
 import { AdapterFactory } from '../util/adapter.js'
+import { buildCLILogger, handleCLIError, parseCLIInput } from '../util/cli.js'
 import { unwrap } from '../util/zod.js'
 
 export const cli: AdapterFactory = () => {
@@ -48,41 +49,13 @@ export const cli: AdapterFactory = () => {
                 throw new Error(`Invalid zod type: ${type.def.type}`)
               }
             }
-            command.action((...args) => {
-              const toString = (value: unknown) => {
-                return typeof value === 'string' ? value : JSON.stringify(value)
-              }
-              const context: ActionContext = {
-                logger: {
-                  error: (data) => { log.error(toString(data)) },
-                  debug: (data) => { log.message(toString(data)) },
-                  info: (data) => { log.info(toString(data)) },
-                  notice: (data) => { log.message(toString(data)) },
-                  warning: (data) => { log.warn(toString(data)) },
-                  critical: (data) => { log.error(toString(data)) },
-                  alert: (data) => { log.error(toString(data)) },
-                  emergency: (data) => { log.error(toString(data)) },
-                  progress: ({ progress, total, message }) => {
-                    console.info({ progress, total, message })
-                  }
-                }
-              }
-              const rawInput = args.at(-2)
-              const input = action.input.parse(rawInput)
-              action.args?.forEach((k, index) => {
-                input[k] = args[index]
-              })
-              intro(`${options.name} - ${action.name}`)
-              action.run(input, context).catch((error) => {
-                if (error instanceof Error) {
-                  console.error(error.message)
-                } else {
-                  throw new Error(error)
-                }
-                process.exit()
-              })
-            })
           }
+          command.action((...args) => {
+            const context: ActionContext = { logger: buildCLILogger() }
+            const input = parseCLIInput(action, args)
+            intro(`${options.name} - ${action.name}`)
+            action.run(input, context).catch(handleCLIError)
+          })
         }
         program.parse()
       },

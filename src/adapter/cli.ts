@@ -2,7 +2,6 @@ import { intro } from '@clack/prompts'
 import { camelCase, kebabCase } from 'change-case'
 import { Command } from 'commander'
 import z from 'zod'
-import { ActionContext } from '../util/action.js'
 import { AdapterFactory } from '../util/adapter.js'
 import { buildCLILogger, handleCLIError, parseCLIInput } from '../util/cli.js'
 import { unwrap } from '../util/zod.js'
@@ -53,10 +52,12 @@ export const cli: AdapterFactory = () => {
             }
           }
           command.action((...args) => {
-            const context: ActionContext = { logger: buildCLILogger() }
+            const logger = buildCLILogger()
             const input = parseCLIInput(action, args)
             intro(`${options.name} - ${action.name}`)
-            action.run(input, context).catch(handleCLIError)
+            action.run(input, { logger }).then((result) => {
+              logger.info(JSON.stringify(result, null, 2))
+            }).catch(handleCLIError)
           })
         }
         program.parse()

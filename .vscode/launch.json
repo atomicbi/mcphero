@@ -5,7 +5,7 @@
     "request": "launch",
     "name": "test:cli",
     "program": "${workspaceFolder}/node_modules/tsx/dist/cli.cjs",
-    "args": ["test/cli.ts", "task"],
+    "args": ["test/cli.ts", "hello", "toby", "--type=dog"],
     "console": "integratedTerminal"
   }, {
     "type": "node",

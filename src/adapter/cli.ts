@@ -45,6 +45,8 @@ export const cli: AdapterFactory = () => {
                 )
               } else if (type instanceof z.ZodRecord) {
                 command.option(`--${kebabCase(key)} <json>`, description, defaultValue)
+              } else if (type instanceof z.ZodEnum) {
+                command.option(`--${kebabCase(key)} <string>`, description, defaultValue)
               } else {
                 throw new Error(`Invalid zod type: ${type.def.type}`)
               }

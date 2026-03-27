@@ -26,31 +26,17 @@ export const cli: AdapterFactory = () => {
             const isArgument = action.args?.includes(key)
             if (isArgument) {
               command.argument(`[${camelCase(key)}]`, description, defaultValue)
+            } else if (type instanceof z.ZodBoolean) {
+              command.option(`--${kebabCase(key)}`, description, defaultValue)
+              command.option(`--no-${kebabCase(key)}`)
+            } else if (type instanceof z.ZodNumber) {
+              command.option(`--${kebabCase(key)} <number>`, description, defaultValue)
+            } else if (type instanceof z.ZodString || type instanceof z.ZodEnum) {
+              command.option(`--${kebabCase(key)} <string>`, description, defaultValue)
+            } else if (type instanceof z.ZodObject || type instanceof z.ZodRecord || type instanceof z.ZodArray) {
+              command.option(`--${kebabCase(key)} <json>`, description ?? '', JSON.parse, defaultValue)
             } else {
-              if (type instanceof z.ZodBoolean) {
-                command.option(`--${kebabCase(key)}`, description, defaultValue)
-                command.option(`--no-${kebabCase(key)}`)
-              } else if (type instanceof z.ZodNumber) {
-                command.option(
-                  `--${kebabCase(key)} <number>`,
-                  description,
-                  defaultValue
-                )
-              } else if (type instanceof z.ZodString) {
-                command.option(
-                  `--${kebabCase(key)} <string>`,
-                  description,
-                  defaultValue
-                )
-              } else if (type instanceof z.ZodRecord) {
-                command.option(`--${kebabCase(key)} <json>`, description ?? '', (rawValue) => JSON.parse(rawValue), defaultValue)
-              } else if (type instanceof z.ZodEnum) {
-                command.option(`--${kebabCase(key)} <string>`, description, defaultValue)
-              } else if (type instanceof z.ZodArray) {
-                command.option(`--${kebabCase(key)} <json>`, description ?? '', (rawValue) => JSON.parse(rawValue), defaultValue)
-              } else {
-                throw new Error(`Invalid zod type: ${type.def.type}`)
-              }
+              throw new Error(`Invalid zod type: ${type.def.type}`)
             }
           }
           command.action((...args) => {

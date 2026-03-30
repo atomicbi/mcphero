@@ -5,7 +5,7 @@ import { TaskAction } from './actions/TaskAction.js'
 
 async function main() {
   await mcphero({ name: 'mcphero', description: 'MCPHero', version: '1.0.0' })
-    .with(http({ host: '127.0.0.1', port: 8080, allowedHosts: ['127.0.0.1'] }))
+    .with(http({ host: 'localhost', port: 8080, allowedHosts: ['localhost'] }))
     .mount(HelloAction)
     .mount(TaskAction)
     .start()

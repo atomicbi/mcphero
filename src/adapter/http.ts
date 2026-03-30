@@ -8,7 +8,7 @@ import cors from 'cors'
 import { randomUUID } from 'crypto'
 import { Request, Response } from 'express'
 import { Server } from 'http'
-import { ActionContext } from '../util/action.js'
+import { Action, ActionContext } from '../util/action.js'
 import { AdapterFactory } from '../util/adapter.js'
 import { buildLogLevels } from '../util/logger.js'
 import { toolResponse } from '../util/mcp.js'
@@ -20,16 +20,68 @@ export interface HttpAdapterOptions extends CreateMcpExpressAppOptions {
 
 export const http: AdapterFactory<HttpAdapterOptions> = ({ host, port, ...mcpOptions }) => {
   return (options) => {
-    const server = new McpServer({
-      name: options.name,
-      description: options.description,
-      version: options.version
-    }, {
-      capabilities: { tools: {}, logging: {} }
-    })
     const app = createMcpExpressApp({ ...mcpOptions, host })
     app.use(cors({ exposedHeaders: ['WWW-Authenticate', 'Mcp-Session-Id', 'Last-Event-Id', 'Mcp-Protocol-Version'], origin: '*' }))
     const transports: Record<string, StreamableHTTPServerTransport> = {}
+    let mountedActions: Action[] = []
+
+    const createServer = () => {
+      const server = new McpServer({
+        name: options.name,
+        description: options.description,
+        version: options.version
+      }, {
+        capabilities: { tools: {}, logging: {} }
+      })
+      for (const action of mountedActions) {
+        server.registerTool(pascalCase(action.name), {
+          title: capitalCase(action.name),
+          description: action.description,
+          inputSchema: action.input
+        }, async (input, { sendNotification, _meta }) => {
+          const context: ActionContext = {
+            logger: {
+              ...buildLogLevels((level, data) => {
+                sendNotification({ method: 'notifications/message', params: { level, data } })
+              }),
+              progress: ({ progress, total, message }) => {
+                if (!_meta?.progressToken) { return }
+                sendNotification({
+                  method: 'notifications/progress',
+                  params: {
+                    progress,
+                    total,
+                    message,
+                    progressToken: _meta.progressToken
+                  }
+                })
+              }
+            }
+          }
+          return action.run(input, context).then((result) => {
+            return toolResponse(result)
+          }).catch((error) => {
+            if (error instanceof Error) {
+              return toolResponse({
+                success: false,
+                name: error.name,
+                message: error.message,
+                stack: error.stack
+              })
+            } else {
+              return toolResponse({
+                success: false,
+                name: 'Unknown Error',
+                message: 'An unknown error occured',
+                error
+              })
+            }
+          })
+        })
+      }
+      return server
+    }
+
     app.post('/mcp', async (req: Request, res: Response) => {
       const sessionId = req.headers['mcp-session-id'] as string | undefined
       try {
@@ -47,6 +99,9 @@ export const http: AdapterFactory<HttpAdapterOptions> = ({ host, port, ...mcpOpt
               transports[sId] = transport
             }
           })
+          transport.onerror = (error) => {
+            console.error(error)
+          }
           transport.onclose = () => {
             const sid = transport.sessionId
             if (sid && transports[sid]) {
@@ -54,7 +109,7 @@ export const http: AdapterFactory<HttpAdapterOptions> = ({ host, port, ...mcpOpt
               delete transports[sid]
             }
           }
-          await server.connect(transport)
+          await createServer().connect(transport)
           await transport.handleRequest(req, res, req.body)
           return
         } else {
@@ -123,59 +178,14 @@ export const http: AdapterFactory<HttpAdapterOptions> = ({ host, port, ...mcpOpt
     let httpServer: Server | undefined
     return {
       start: async (actions) => {
-        for (const action of actions) {
-          server.registerTool(pascalCase(action.name), {
-            title: capitalCase(action.name),
-            description: action.description,
-            inputSchema: action.input
-          }, async (input, { sendNotification, _meta }) => {
-            const context: ActionContext = {
-              logger: {
-                ...buildLogLevels((level, data) => {
-                  sendNotification({ method: 'notifications/message', params: { level, data } })
-                }),
-                progress: ({ progress, total, message }) => {
-                  if (!_meta?.progressToken) { return }
-                  sendNotification({
-                    method: 'notifications/progress',
-                    params: {
-                      progress,
-                      total,
-                      message,
-                      progressToken: _meta.progressToken
-                    }
-                  })
-                }
-              }
-            }
-            return action.run(input, context).then((result) => {
-              return toolResponse(result)
-            }).catch((error) => {
-              if (error instanceof Error) {
-                return toolResponse({
-                  success: false,
-                  name: error.name,
-                  message: error.message,
-                  stack: error.stack
-                })
-              } else {
-                return toolResponse({
-                  success: false,
-                  name: 'Unknown Error',
-                  message: 'An unknown error occured',
-                  error
-                })
-              }
-            })
-          })
-        }
+        mountedActions = actions
 
         httpServer = app.listen(port, host, (error) => {
           if (error) {
             console.error('Failed to start server:', error)
             process.exit(1)
           }
-          console.log(`MCP Streamable HTTP Server listening on port ${port}`)
+          console.log(`MCP Streamable HTTP Server listening on http://${host}:${port}/mcp`)
         })
       },
       stop: async () => {

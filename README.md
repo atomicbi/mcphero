@@ -155,7 +155,7 @@ import { stdio, http, fastify, cli } from 'mcphero'
 stdio()
 
 // Host and port required
-http({ host: '127.0.0.1', port: 3000 })
+http({ host: 'localhost', port: 8080 })
 
 // Full Fastify options pass-through
 fastify({ host: 'localhost', port: 8080, logger: true })
@@ -244,9 +244,9 @@ import { mcphero, http } from 'mcphero'
 
 await mcphero({ name: 'my-tools', description: 'My Tools', version: '1.0.0' })
   .with(http({
-    host: '127.0.0.1',
-    port: 3000,
-    allowedHosts: ['127.0.0.1']
+    host: 'localhost',
+    port: 8080,
+    allowedHosts: ['localhost']
   }))
   .mount(MyAction)
   .start()
@@ -528,7 +528,7 @@ npx @modelcontextprotocol/inspector --config .mcp.json --server my-tools
 For the streamable HTTP adapter, point your client at the `/mcp` endpoint:
 
 ```
-http://127.0.0.1:3000/mcp
+http://localhost:8080/mcp
 ```
 
 ---

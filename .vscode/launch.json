@@ -10,6 +10,13 @@
   }, {
     "type": "node",
     "request": "launch",
+    "name": "test:cliProxy",
+    "program": "${workspaceFolder}/node_modules/tsx/dist/cli.cjs",
+    "args": ["test/cliProxy.ts", "task", "--meta", "{\"id\":\"8de36e60-83f8-4a48-bf45-7332b0540c52\",\"name\":\"Example\"}"],
+    "outputCapture": "std"
+  }, {
+    "type": "node",
+    "request": "launch",
     "name": "test:stdio",
     "program": "${workspaceFolder}/node_modules/@modelcontextprotocol/inspector/cli/build/cli.js",
     "args": ["--config", ".mcp.json"]

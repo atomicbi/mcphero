@@ -1,4 +1,5 @@
 export * from './adapter/cli.js'
+export * from './adapter/cliProxy.js'
 export * from './adapter/fastify.js'
 export * from './adapter/http.js'
 export * from './adapter/stdio.js'

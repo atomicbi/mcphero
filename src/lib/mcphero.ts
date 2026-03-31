@@ -10,6 +10,7 @@ export interface MCPHeroOptions {
 export interface MCPHero {
   with: (generator: AdapterGenerator) => MCPHero
   mount: (action: Action) => MCPHero
+  mountAll: (actions: Action[]) => MCPHero
   start: () => Promise<MCPHero>
 }
 
@@ -21,8 +22,12 @@ export function mcphero(options: MCPHeroOptions): MCPHero {
       adapters.push(generator(options))
       return instance
     },
-    mount: (action) => {
-      actions.push(action)
+    mount: (value) => {
+      actions.push(value)
+      return instance
+    },
+    mountAll: (values) => {
+      actions.push(...values)
       return instance
     },
     start: async () => {

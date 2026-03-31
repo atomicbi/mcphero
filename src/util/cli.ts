@@ -44,7 +44,7 @@ export function buildCLILogger(): Logger {
     alert: (data) => { log.error(toString(data)) },
     emergency: (data) => { log.error(toString(data)) },
     progress: ({ progress, total, message }) => {
-      console.info({ progress, total, message })
+      log.info(toString({ progress, total, message }))
     }
   }
 }

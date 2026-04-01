@@ -12,7 +12,7 @@ export interface MCPHero {
   set: <T>(key: string, value: T) => MCPHero
   adapter: (generator: AdapterGenerator) => MCPHero
   action: (action: Action) => MCPHero
-  acitons: (actions: Action[]) => MCPHero
+  actions: (actions: Action[]) => MCPHero
   start: () => Promise<MCPHero>
 }
 
@@ -33,7 +33,7 @@ export function mcphero(options: MCPHeroOptions): MCPHero {
       actions.push(value)
       return builder
     },
-    acitons: (values) => {
+    actions: (values) => {
       actions.push(...values)
       return builder
     },

@@ -1,6 +1,7 @@
 import { FastifyBaseLogger, FastifyHttpOptions, fastify as fastifyInstance } from 'fastify'
 import { Server } from 'http'
 import { AdapterFactory } from '../util/adapter.js'
+import { Logger } from '../util/logger.js'
 
 export interface FastifyAdapterOptions extends FastifyHttpOptions<Server, FastifyBaseLogger> {
   host?: string
@@ -9,9 +10,10 @@ export interface FastifyAdapterOptions extends FastifyHttpOptions<Server, Fastif
 
 export const fastify: AdapterFactory<FastifyAdapterOptions> = ({ host, port, ...fastifyOptions }) => {
   const instance = fastifyInstance(fastifyOptions)
-  const logger = instance.log
-  return (options) => {
+  return (options, baseContext) => {
+    const context = baseContext.fork({ adapter: 'fastify' })
     return {
+      context,
       start: async (actions) => {
         await instance.register(import('@fastify/swagger'), {
           openapi: {
@@ -37,19 +39,20 @@ export const fastify: AdapterFactory<FastifyAdapterOptions> = ({ host, port, ...
                 200: { description: 'Successful response' }
               }
             }
-          }, (request) => action.run(request.body, {
-            logger: {
-              error: (data) => { logger.error(data) },
-              debug: (data) => { logger.debug(data) },
-              info: (data) => { logger.info(data) },
-              notice: (data) => { logger.debug(data) },
-              warning: (data) => { logger.warn(data) },
-              critical: (data) => { logger.fatal(data) },
-              alert: (data) => { logger.error(data) },
-              emergency: (data) => { logger.fatal(data) },
-              progress: ({ progress, total, message }) => { logger.trace({ progress, total }, message) }
+          }, (request) => {
+            const logger: Logger = {
+              error: (data) => { instance.log.error(data) },
+              debug: (data) => { instance.log.debug(data) },
+              info: (data) => { instance.log.info(data) },
+              notice: (data) => { instance.log.debug(data) },
+              warning: (data) => { instance.log.warn(data) },
+              critical: (data) => { instance.log.fatal(data) },
+              alert: (data) => { instance.log.error(data) },
+              emergency: (data) => { instance.log.fatal(data) },
+              progress: ({ progress, total, message }) => { instance.log.trace({ progress, total }, message) }
             }
-          }))
+            return action.run(request.body, context.fork({ logger, request }))
+          })
         }
         await instance.listen({ host, port })
       },

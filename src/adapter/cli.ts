@@ -7,13 +7,15 @@ import { buildCLILogger, handleCLIError, parseCLIInput } from '../util/cli.js'
 import { unwrap } from '../util/zod.js'
 
 export const cli: AdapterFactory = () => {
-  return (options) => {
+  return (options, baseContext) => {
+    const context = baseContext.fork({ adapter: 'cli' })
     const program = new Command()
       .name(options.name)
       .description(options.description)
       .version(options.version)
 
     return {
+      context,
       start: async (actions) => {
         for (const action of actions) {
           const name = kebabCase(action.name)
@@ -43,7 +45,7 @@ export const cli: AdapterFactory = () => {
             const logger = buildCLILogger()
             const input = parseCLIInput(action, args)
             intro(`${options.name} - ${action.name}`)
-            action.run(input, { logger }).then((result) => {
+            action.run(input, context.fork({ logger, command })).then((result) => {
               logger.info(JSON.stringify(result, null, 2))
             }).catch(handleCLIError)
           })

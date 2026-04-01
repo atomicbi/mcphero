@@ -17,7 +17,8 @@ export interface CliProxyOptions {
 }
 
 export const cliProxy: AdapterFactory<CliProxyOptions> = ({ url }) => {
-  return (options) => {
+  return (options, baseContext) => {
+    const context = baseContext.fork({ adapter: 'cliProxy' })
     const program = new Command()
       .name(options.name)
       .description(options.description)
@@ -25,6 +26,7 @@ export const cliProxy: AdapterFactory<CliProxyOptions> = ({ url }) => {
       .option('-s, --silent', 'Silent mode, prevent log messages', false)
 
     return {
+      context,
       start: async () => {
         const client = new Client({
           name: options.name,

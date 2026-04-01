@@ -1,20 +1,17 @@
 /* eslint-disable @typescript-eslint/no-explicit-any */
 import z from 'zod'
-import { Logger } from './logger.js'
-
-export interface ActionContext {
-  logger: Logger
-}
+import { MCPHeroContext } from './context.js'
 
 export interface Action<I extends object = any, O extends object = any> {
   name: string
   description: string
   input: z.ZodType<I> & { shape: Record<string, z.ZodTypeAny> }
   args?: (keyof I)[]
-  run: (input: I, context: ActionContext) => Promise<O>
+  isEnabled?: (context: MCPHeroContext) => boolean
+  run: (input: I, context: MCPHeroContext) => Promise<O>
 }
 
-export function createAction<I extends object, O extends object>(
+export function createAction<I extends object = object, O extends object = object>(
   action: Action<I, O>
 ): Action<I, O> {
   return action

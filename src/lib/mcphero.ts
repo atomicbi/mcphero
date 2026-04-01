@@ -1,5 +1,6 @@
 import { Action } from '../util/action.js'
 import { Adapter, AdapterGenerator } from '../util/adapter.js'
+import { createContext } from '../util/context.js'
 
 export interface MCPHeroOptions {
   name: string
@@ -8,32 +9,43 @@ export interface MCPHeroOptions {
 }
 
 export interface MCPHero {
-  with: (generator: AdapterGenerator) => MCPHero
-  mount: (action: Action) => MCPHero
-  mountAll: (actions: Action[]) => MCPHero
+  set: <T>(key: string, value: T) => MCPHero
+  adapter: (generator: AdapterGenerator) => MCPHero
+  action: (action: Action) => MCPHero
+  acitons: (actions: Action[]) => MCPHero
   start: () => Promise<MCPHero>
 }
 
 export function mcphero(options: MCPHeroOptions): MCPHero {
   const adapters: Adapter[] = []
   const actions: Action[] = []
-  const instance: MCPHero = {
-    with: (generator) => {
-      adapters.push(generator(options))
-      return instance
+  const context = createContext()
+  const builder: MCPHero = {
+    set: (key, value) => {
+      context.set(key, value)
+      return builder
     },
-    mount: (value) => {
+    adapter: (generator) => {
+      adapters.push(generator(options, context))
+      return builder
+    },
+    action: (value) => {
       actions.push(value)
-      return instance
+      return builder
     },
-    mountAll: (values) => {
+    acitons: (values) => {
       actions.push(...values)
-      return instance
+      return builder
     },
     start: async () => {
-      await Promise.all(adapters.map((adapter) => adapter.start(actions)))
-      return instance
+      await Promise.all(adapters.map((adapter) => {
+        return adapter.start(actions.filter((action) => {
+          if (!action.isEnabled) { return true }
+          return action.isEnabled(adapter.context)
+        }))
+      }))
+      return builder
     }
   }
-  return instance
+  return builder
 }

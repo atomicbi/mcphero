@@ -8,9 +8,9 @@ import cors from 'cors'
 import { randomUUID } from 'crypto'
 import { Request, Response } from 'express'
 import { Server } from 'http'
-import { Action, ActionContext } from '../util/action.js'
+import { Action } from '../util/action.js'
 import { AdapterFactory } from '../util/adapter.js'
-import { buildLogLevels } from '../util/logger.js'
+import { buildLogLevels, Logger } from '../util/logger.js'
 import { toolResponse } from '../util/mcp.js'
 
 export interface HttpAdapterOptions extends CreateMcpExpressAppOptions {
@@ -19,7 +19,8 @@ export interface HttpAdapterOptions extends CreateMcpExpressAppOptions {
 }
 
 export const http: AdapterFactory<HttpAdapterOptions> = ({ host, port, ...mcpOptions }) => {
-  return (options) => {
+  return (options, baseContext) => {
+    const context = baseContext.fork({ adapter: 'http' })
     const app = createMcpExpressApp({ ...mcpOptions, host })
     app.use(cors({ exposedHeaders: ['WWW-Authenticate', 'Mcp-Session-Id', 'Last-Event-Id', 'Mcp-Protocol-Version'], origin: '*' }))
     const transports: Record<string, StreamableHTTPServerTransport> = {}
@@ -38,43 +39,31 @@ export const http: AdapterFactory<HttpAdapterOptions> = ({ host, port, ...mcpOpt
           title: capitalCase(action.name),
           description: action.description,
           inputSchema: action.input
-        }, async (input, { sendNotification, _meta }) => {
-          const context: ActionContext = {
-            logger: {
-              ...buildLogLevels((level, data) => {
-                sendNotification({ method: 'notifications/message', params: { level, data } })
-              }),
-              progress: ({ progress, total, message }) => {
-                if (!_meta?.progressToken) { return }
-                sendNotification({
-                  method: 'notifications/progress',
-                  params: {
-                    progress,
-                    total,
-                    message,
-                    progressToken: _meta.progressToken
-                  }
-                })
-              }
+        }, async (input, extra) => {
+          const logger: Logger = {
+            ...buildLogLevels((level, data) => {
+              extra.sendNotification({ method: 'notifications/message', params: { level, data } })
+            }),
+            progress: ({ progress, total, message }) => {
+              if (!extra._meta?.progressToken) { return }
+              extra.sendNotification({
+                method: 'notifications/progress',
+                params: {
+                  progress,
+                  total,
+                  message,
+                  progressToken: extra._meta.progressToken
+                }
+              })
             }
           }
-          return action.run(input, context).then((result) => {
+          return action.run(input, context.fork({ logger, extra })).then((result) => {
             return toolResponse(result)
           }).catch((error) => {
             if (error instanceof Error) {
-              return toolResponse({
-                success: false,
-                name: error.name,
-                message: error.message,
-                stack: error.stack
-              })
+              return toolResponse({ success: false, name: error.name, message: error.message, stack: error.stack })
             } else {
-              return toolResponse({
-                success: false,
-                name: 'Unknown Error',
-                message: 'An unknown error occured',
-                error
-              })
+              return toolResponse({ success: false, name: 'Unknown Error', message: 'An unknown error occured', error })
             }
           })
         })
@@ -177,6 +166,7 @@ export const http: AdapterFactory<HttpAdapterOptions> = ({ host, port, ...mcpOpt
 
     let httpServer: Server | undefined
     return {
+      context,
       start: async (actions) => {
         mountedActions = actions
 

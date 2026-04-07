@@ -15,7 +15,7 @@ const { adapter, handler } = vercel({
       `${process.env.BASE_URL!}/*`,
       'http://localhost:*',
       'http://127.0.0.1:*',
-      'mcpjam://oauth/callback'
+      'mcpjam://*'
     ],
     requiredScopes: ['openid', 'email'],
     callbackPath: '/auth/callback',

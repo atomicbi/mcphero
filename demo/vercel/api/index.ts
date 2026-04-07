@@ -14,7 +14,7 @@ const { adapter, handler } = vercel({
     requiredScopes: ['openid', 'email'],
     callbackPath: '/auth/callback',
     signingKey: process.env.SIGNING_KEY!,
-    store: createRedisStore({ client: Redis.fromEnv() })
+    store: createRedisStore({ client: new Redis({ url: process.env.UPSTASH_KV_REST_API_URL!, token: process.env.UPSTASH_KV_REST_API_TOKEN! }) })
   })
 })
 

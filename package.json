@@ -12,7 +12,8 @@
     "lint": "turbo lint",
     "check": "turbo check",
     "clean": "turbo clean && rimraf .turbo/cache",
-    "prepack": "turbo prepack"
+    "prepack": "turbo prepack",
+    "publish:all": "pnpm publish -r --access public"
   },
   "devDependencies": {
     "@eslint/js": "^10.0.1",

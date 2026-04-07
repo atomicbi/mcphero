@@ -1,6 +1,6 @@
+import { mcphero } from '@mcphero/core'
+import { http } from '@mcphero/mcp'
 import { randomUUID } from 'crypto'
-import { http } from '../src/adapter/http.js'
-import { mcphero } from '../src/lib/mcphero.js'
 import { AdminAction } from './actions/AdminAction.js'
 import { HelloAction } from './actions/HelloAction.js'
 import { TaskAction } from './actions/TaskAction.js'

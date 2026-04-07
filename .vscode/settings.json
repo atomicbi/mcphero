@@ -6,6 +6,11 @@
     "source.fixAll.eslint": "explicit",
     "source.organizeImports": "explicit"
   },
+  "eslint.workingDirectories": [
+    "example",
+    "packages/core",
+    "packages/examples"
+  ],
   "editor.defaultFormatter": "dbaeumer.vscode-eslint",
   "editor.formatOnSave": true,
   "editor.formatOnSaveMode": "file",

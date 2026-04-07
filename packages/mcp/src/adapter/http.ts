@@ -1,3 +1,4 @@
+import { Action, AdapterFactory, buildLogLevels, Logger, SideloadResource, toolResponse } from '@mcphero/core'
 import { InMemoryEventStore } from '@modelcontextprotocol/sdk/examples/shared/inMemoryEventStore.js'
 import { createMcpExpressApp, CreateMcpExpressAppOptions } from '@modelcontextprotocol/sdk/server/express.js'
 import { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js'
@@ -7,11 +8,8 @@ import { capitalCase, pascalCase } from 'change-case'
 import cors from 'cors'
 import { randomUUID } from 'crypto'
 import { Request, Response } from 'express'
+import { readFile } from 'fs/promises'
 import { Server } from 'http'
-import { Action } from '../util/action.js'
-import { AdapterFactory } from '../util/adapter.js'
-import { buildLogLevels, Logger } from '../util/logger.js'
-import { toolResponse } from '../util/mcp.js'
 
 export interface HttpAdapterOptions extends CreateMcpExpressAppOptions {
   host: string
@@ -70,6 +68,16 @@ export const http: AdapterFactory<HttpAdapterOptions> = ({ host, port, ...mcpOpt
       }
       return server
     }
+
+    app.get('/resource/:id', async (req: Request, res: Response) => {
+      const id = req.params.id
+      if (!id || typeof id !== 'string') { throw new Error('Invalid ID') }
+      const resourceMeta: SideloadResource = JSON.parse(await readFile(`resources/${id}.json`, 'utf-8'))
+      const buffer = await readFile(`resources/${id}`)
+      res.status(200)
+      res.header('Content-Type', resourceMeta.contentType)
+      res.send(buffer)
+    })
 
     app.post('/mcp', async (req: Request, res: Response) => {
       const sessionId = req.headers['mcp-session-id'] as string | undefined
@@ -162,6 +170,25 @@ export const http: AdapterFactory<HttpAdapterOptions> = ({ host, port, ...mcpOpt
           res.status(500).send('Error processing session termination')
         }
       }
+    })
+
+    app.get('/mcp/resource/:id', async (req: Request, res: Response) => {
+      const sessionId = req.headers['mcp-session-id'] as string | undefined
+      if (!sessionId || !transports[sessionId]) {
+        res.status(400).send('Invalid or missing session ID')
+        return
+      }
+
+      // Check for Last-Event-ID header for resumability
+      const lastEventId = req.headers['last-event-id'] as string | undefined
+      if (lastEventId) {
+        console.log(`Client reconnecting with Last-Event-ID: ${lastEventId}`)
+      } else {
+        console.log(`Establishing new SSE stream for session ${sessionId}`)
+      }
+
+      const transport = transports[sessionId]
+      await transport.handleRequest(req, res)
     })
 
     let httpServer: Server | undefined

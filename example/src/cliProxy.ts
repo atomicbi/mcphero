@@ -1,13 +1,13 @@
-import { fastify } from '../src/adapter/fastify.js'
-import { mcphero } from '../src/index.js'
+import { mcphero } from '@mcphero/core'
+import { cliProxy } from '@mcphero/mcp'
 import { HelloAction } from './actions/HelloAction.js'
 import { TaskAction } from './actions/TaskAction.js'
 
 async function main() {
   await mcphero({ name: 'mcphero', description: 'MCPHero', version: '1.0.0' })
-    .with(fastify({ host: 'localhost', port: 8080, logger: true }))
-    .mount(HelloAction)
-    .mount(TaskAction)
+    .adapter(cliProxy({ url: new URL('http://localhost:8080/mcp') }))
+    .action(HelloAction)
+    .action(TaskAction)
     .start()
 }
 

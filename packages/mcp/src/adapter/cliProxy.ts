@@ -1,16 +1,13 @@
 import { intro } from '@clack/prompts'
+import { AdapterFactory, buildCLILogger, parseToolResponse, ToolResponse, unwrap } from '@mcphero/core'
 import { Client } from '@modelcontextprotocol/sdk/client'
 import { StreamableHTTPClientTransport } from '@modelcontextprotocol/sdk/client/streamableHttp.js'
 import { LoggingMessageNotificationSchema, ProgressNotificationSchema } from '@modelcontextprotocol/sdk/types'
 import { kebabCase } from 'change-case'
 import { Command } from 'commander'
 import { randomUUID } from 'crypto'
-import z from 'zod'
+import { z } from 'zod'
 import { JSONSchema } from 'zod/v4/core'
-import { AdapterFactory } from '../util/adapter.js'
-import { buildCLILogger } from '../util/cli.js'
-import { parseToolResponse, ToolResponse } from '../util/mcp.js'
-import { unwrap } from '../util/zod.js'
 
 export interface CliProxyOptions {
   url: URL
@@ -40,7 +37,8 @@ export const cliProxy: AdapterFactory<CliProxyOptions> = ({ url }) => {
           const name = kebabCase(tool.name)
           const command = program.command(name)
           if (tool.description) { command.description(tool.description) }
-          const schema = z.fromJSONSchema(tool.inputSchema as JSONSchema.JSONSchema) as z.ZodObject
+          const schema = z.fromJSONSchema(tool.inputSchema as JSONSchema.JSONSchema)
+          if (!(schema instanceof z.ZodObject)) { throw new Error('Invalid schema') }
           const shape = schema.shape
           const keys = Object.keys(shape)
           for (const key of keys) {

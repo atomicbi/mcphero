@@ -1,5 +1,6 @@
 node_modules/
 build/
+resources/
 *.tsbuildinfo
 .turbo
 .DS_Store

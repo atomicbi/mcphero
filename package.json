@@ -3,6 +3,7 @@
   "private": true,
   "description": "MCP Hero Toolkit",
   "scripts": {
+    "mcp": "cd example && pnpm tsx src/stdio.ts",
     "build": "turbo build",
     "lint": "turbo lint",
     "check": "turbo check",

@@ -1,7 +1,5 @@
+import { createAction, createSideloadResource, Logger } from '@mcphero/core'
 import z from 'zod'
-import { Logger } from '../../core/src/index.js'
-import { createAction } from '../../core/src/util/action.js'
-import { createSideloadResource } from '../../core/src/util/sideload.js'
 
 export const TaskAction = createAction({
   name: 'task',

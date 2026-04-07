@@ -2,7 +2,12 @@
   "mcpServers": {
     "mcphero": {
       "command": "pnpm",
-      "args": ["tsx", "test/stdio.ts"]
+      "args": ["mcp"]
+    },
+    "roam-code": {
+      "type": "stdio",
+      "command": "roam",
+      "args": ["mcp"]
     }
   }
 }

@@ -4,9 +4,10 @@ export default defineConfig({
   entry: ['src/index.ts'],
   outDir: 'build',
   format: ['esm'],
-  target: 'node18',
+  target: 'es2022',
   dts: true,
   clean: true,
   sourcemap: true,
-  splitting: false
+  splitting: false,
+  external: [/^[^./]/]
 })

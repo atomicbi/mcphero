@@ -10,7 +10,13 @@ const { adapter, handler } = vercel({
     clientId: process.env.GOOGLE_CLIENT_ID!,
     clientSecret: process.env.GOOGLE_CLIENT_SECRET!,
     resourceUrl: process.env.BASE_URL!,
-    redirectUris: ['http://localhost:*', 'http://127.0.0.1:*', 'https://claude.ai/*', `${process.env.BASE_URL!}/*`],
+    redirectUris: [
+      'https://claude.ai/*',
+      `${process.env.BASE_URL!}/*`,
+      'http://localhost:*',
+      'http://127.0.0.1:*',
+      'mcpjam://oauth/callback'
+    ],
     requiredScopes: ['openid', 'email'],
     callbackPath: '/auth/callback',
     signingKey: process.env.SIGNING_KEY!,

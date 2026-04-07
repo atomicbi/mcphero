@@ -2,6 +2,11 @@
   "name": "@mcphero/logger",
   "version": "1.1.6",
   "description": "MCP Hero Logger",
+  "repository": {
+    "type": "git",
+    "url": "git+ssh://git@github.com/atomicbi/mcphero.git",
+    "directory": "packages/logger"
+  },
   "type": "module",
   "main": "build/index.js",
   "types": "build/index.d.ts",

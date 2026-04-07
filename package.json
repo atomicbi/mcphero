@@ -2,6 +2,10 @@
   "name": "mcphero",
   "private": true,
   "description": "MCP Hero Toolkit",
+  "repository": {
+    "type": "git",
+    "url": "git+ssh://git@github.com/atomicbi/mcphero.git"
+  },
   "scripts": {
     "mcp": "cd example && pnpm tsx src/stdio.ts",
     "build": "turbo build",

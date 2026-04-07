@@ -1,7 +1,11 @@
 {
   "name": "@mcphero/demo-vercel",
-  "version": "0.0.0",
   "private": true,
+  "repository": {
+    "type": "git",
+    "url": "git+ssh://git@github.com/atomicbi/mcphero.git",
+    "directory": "demo/vercel"
+  },
   "type": "module",
   "dependencies": {
     "@mcphero/core": "workspace:*",

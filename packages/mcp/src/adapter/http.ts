@@ -1,5 +1,5 @@
 import { AuthConfig, AuthInfo, generateProtectedResourceMetadata, OAuthRequest, OAuthResponse, validateToken } from '@mcphero/auth'
-import { Action, AdapterFactory, SideloadResource, toolResponse } from '@mcphero/core'
+import { Action, AdapterFactory, MCPHeroContext, MCPHeroOptions, SideloadResource, toolResponse } from '@mcphero/core'
 import { createLogger } from '@mcphero/logger'
 import { InMemoryEventStore } from '@modelcontextprotocol/sdk/examples/shared/inMemoryEventStore.js'
 import { createMcpExpressApp, CreateMcpExpressAppOptions } from '@modelcontextprotocol/sdk/server/express.js'
@@ -9,7 +9,7 @@ import { isInitializeRequest } from '@modelcontextprotocol/sdk/types.js'
 import { capitalCase, pascalCase } from 'change-case'
 import cors from 'cors'
 import { randomUUID } from 'crypto'
-import express, { Request, Response } from 'express'
+import express, { Express, Request, Response } from 'express'
 import { readFile } from 'fs/promises'
 import { Server } from 'http'
 import { AsyncLocalStorage } from 'node:async_hooks'
@@ -20,6 +20,184 @@ export interface HttpAdapterOptions extends CreateMcpExpressAppOptions {
   host: string
   port: number
   auth?: AuthConfig
+}
+
+function mountOAuthRoutes(app: Express, auth: AuthConfig): Set<string> {
+  const provider = auth.provider!
+  const callbackPath = auth.callbackPath ?? '/auth/callback'
+
+  const toOAuthReq = (req: Request): OAuthRequest => ({
+    method: req.method,
+    url: new URL(req.url, `${req.protocol}://${req.get('host')}`),
+    headers: Object.fromEntries(Object.entries(req.headers).map(([k, v]) => [k, Array.isArray(v) ? v[0] : v])),
+    body: req.body as Record<string, string> | undefined
+  })
+
+  const sendOAuth = (res: Response, oauthRes: OAuthResponse) => {
+    for (const [key, value] of Object.entries(oauthRes.headers)) { res.header(key, value) }
+    if (oauthRes.body) {
+      res.status(oauthRes.status).send(typeof oauthRes.body === 'string' ? oauthRes.body : JSON.stringify(oauthRes.body))
+    } else {
+      res.status(oauthRes.status).end()
+    }
+  }
+
+  app.get('/.well-known/oauth-authorization-server', (_req: Request, res: Response) => {
+    sendOAuth(res, provider.metadata())
+  })
+  app.get('/authorize', async (req: Request, res: Response) => {
+    sendOAuth(res, await provider.authorize(toOAuthReq(req)))
+  })
+  app.get(callbackPath, async (req: Request, res: Response) => {
+    sendOAuth(res, await provider.callback(toOAuthReq(req)))
+  })
+  app.post('/token', express.urlencoded({ extended: false }), async (req: Request, res: Response) => {
+    sendOAuth(res, await provider.token(toOAuthReq(req)))
+  })
+  app.post('/register', express.json(), async (req: Request, res: Response) => {
+    sendOAuth(res, await provider.register(toOAuthReq(req)))
+  })
+
+  return new Set(['/.well-known/oauth-authorization-server', '/authorize', callbackPath, '/token', '/register'])
+}
+
+function mountAuthMiddleware(app: Express, auth: AuthConfig, oauthPaths: Set<string>) {
+  app.use(async (req: Request, res: Response, next: (err?: unknown) => void) => {
+    if (req.path.startsWith('/.well-known/') || oauthPaths.has(req.path)) { return next() }
+    const result = await validateToken(req.headers.authorization, auth)
+    if (result.error) {
+      for (const [key, value] of Object.entries(result.error.headers)) {
+        res.header(key, value)
+      }
+      res.status(result.error.statusCode).json(result.error.body)
+      return
+    }
+    if (result.auth) {
+      authStorage.run(result.auth, () => { next() })
+    } else {
+      next()
+    }
+  })
+}
+
+function createMcpServer(options: MCPHeroOptions, actions: Action[], context: MCPHeroContext): McpServer {
+  const server = new McpServer({
+    name: options.name,
+    description: options.description,
+    version: options.version
+  }, {
+    capabilities: { tools: {}, logging: {} }
+  })
+
+  for (const action of actions) {
+    server.registerTool(pascalCase(action.name), {
+      title: capitalCase(action.name),
+      description: action.description,
+      inputSchema: action.input
+    }, async (input, extra) => {
+      const logger = createLogger({
+        stream: process.stderr,
+        onLog: (level, data) => {
+          extra.sendNotification({ method: 'notifications/message', params: { level, data } })
+        },
+        onProgress: ({ progress, total, message }) => {
+          if (!extra._meta?.progressToken) { return }
+          extra.sendNotification({
+            method: 'notifications/progress',
+            params: {
+              progress,
+              total,
+              message,
+              progressToken: extra._meta.progressToken
+            }
+          })
+        }
+      })
+      const currentAuth = authStorage.getStore()
+      return action.run(input, context.fork({ logger, extra, ...(currentAuth ? { auth: currentAuth } : {}) })).then((result) => {
+        return toolResponse(result)
+      }).catch((error) => {
+        if (error instanceof Error) {
+          return toolResponse({ success: false, name: error.name, message: error.message, stack: error.stack })
+        } else {
+          return toolResponse({ success: false, name: 'Unknown Error', message: 'An unknown error occured', error })
+        }
+      })
+    })
+  }
+
+  return server
+}
+
+function mountMcpTransport(
+  app: Express,
+  transports: Record<string, StreamableHTTPServerTransport>,
+  createServer: () => McpServer
+) {
+  app.post('/mcp', async (req: Request, res: Response) => {
+    const sessionId = req.headers['mcp-session-id'] as string | undefined
+    try {
+      let transport: StreamableHTTPServerTransport
+      if (sessionId && transports[sessionId]) {
+        transport = transports[sessionId]
+      } else if (isInitializeRequest(req.body)) {
+        const eventStore = new InMemoryEventStore()
+        transport = new StreamableHTTPServerTransport({
+          sessionIdGenerator: () => randomUUID(),
+          enableJsonResponse: false,
+          eventStore,
+          onsessioninitialized: (sId) => {
+            console.log(`Session initialized with ID: ${sId}`)
+            transports[sId] = transport
+          }
+        })
+        transport.onerror = (error) => {
+          console.error(error)
+        }
+        transport.onclose = () => {
+          const sid = transport.sessionId
+          if (sid && transports[sid]) {
+            console.log(`Transport closed for session ${sid}, removing from transports map`)
+            delete transports[sid]
+          }
+        }
+        await createServer().connect(transport)
+        await transport.handleRequest(req, res, req.body)
+        return
+      } else {
+        res.status(404).json({
+          jsonrpc: '2.0',
+          error: { code: -32_000, message: 'Session not found' },
+          id: null
+        })
+        return
+      }
+      await transport.handleRequest(req, res, req.body)
+    } catch (error) {
+      console.error('Error handling MCP request:', error)
+      if (!res.headersSent) {
+        res.status(500).json({
+          jsonrpc: '2.0',
+          error: { code: -32_603, message: 'Internal server error' },
+          id: null
+        })
+      }
+    }
+  })
+
+  const handleSessionStream = async (req: Request, res: Response) => {
+    const sessionId = req.headers['mcp-session-id'] as string | undefined
+    if (!sessionId || !transports[sessionId]) {
+      res.status(400).send('Invalid or missing session ID')
+      return
+    }
+    const transport = transports[sessionId]
+    await transport.handleRequest(req, res)
+  }
+
+  app.get('/mcp', handleSessionStream)
+  app.delete('/mcp', handleSessionStream)
+  app.get('/mcp/resource/:id', handleSessionStream)
 }
 
 export const http: AdapterFactory<HttpAdapterOptions> = ({ host, port, auth, ...mcpOptions }) => {
@@ -35,115 +213,14 @@ export const http: AdapterFactory<HttpAdapterOptions> = ({ host, port, auth, ...
       })
     }
 
-    const oauthPaths = new Set<string>()
-    if (auth?.provider) {
-      const provider = auth.provider
-      const toOAuthReq = (req: Request): OAuthRequest => ({
-        method: req.method,
-        url: new URL(req.url, `${req.protocol}://${req.get('host')}`),
-        headers: Object.fromEntries(Object.entries(req.headers).map(([k, v]) => [k, Array.isArray(v) ? v[0] : v])),
-        body: req.body as Record<string, string> | undefined
-      })
-      const sendOAuth = (res: Response, oauthRes: OAuthResponse) => {
-        for (const [key, value] of Object.entries(oauthRes.headers)) { res.header(key, value) }
-        if (oauthRes.body) {
-          res.status(oauthRes.status).send(typeof oauthRes.body === 'string' ? oauthRes.body : JSON.stringify(oauthRes.body))
-        } else {
-          res.status(oauthRes.status).end()
-        }
-      }
-
-      oauthPaths.add('/.well-known/oauth-authorization-server')
-      oauthPaths.add('/authorize')
-      oauthPaths.add('/auth/callback')
-      oauthPaths.add('/token')
-      oauthPaths.add('/register')
-
-      app.get('/.well-known/oauth-authorization-server', (_req: Request, res: Response) => {
-        sendOAuth(res, provider.metadata())
-      })
-      app.get('/authorize', async (req: Request, res: Response) => {
-        sendOAuth(res, await provider.authorize(toOAuthReq(req)))
-      })
-      app.get('/auth/callback', async (req: Request, res: Response) => {
-        sendOAuth(res, await provider.callback(toOAuthReq(req)))
-      })
-      app.post('/token', express.urlencoded({ extended: false }), async (req: Request, res: Response) => {
-        sendOAuth(res, await provider.token(toOAuthReq(req)))
-      })
-      app.post('/register', express.json(), async (req: Request, res: Response) => {
-        sendOAuth(res, await provider.register(toOAuthReq(req)))
-      })
-    }
+    const oauthPaths = auth?.provider ? mountOAuthRoutes(app, auth) : new Set<string>()
 
     if (auth) {
-      app.use(async (req: Request, res: Response, next: (err?: unknown) => void) => {
-        if (req.path.startsWith('/.well-known/') || oauthPaths.has(req.path)) { return next() }
-        const result = await validateToken(req.headers.authorization, auth)
-        if (result.error) {
-          for (const [key, value] of Object.entries(result.error.headers)) {
-            res.header(key, value)
-          }
-          res.status(result.error.statusCode).json(result.error.body)
-          return
-        }
-        if (result.auth) {
-          authStorage.run(result.auth, () => { next() })
-        } else {
-          next()
-        }
-      })
+      mountAuthMiddleware(app, auth, oauthPaths)
     }
 
     const transports: Record<string, StreamableHTTPServerTransport> = {}
     let mountedActions: Action[] = []
-
-    const createServer = () => {
-      const server = new McpServer({
-        name: options.name,
-        description: options.description,
-        version: options.version
-      }, {
-        capabilities: { tools: {}, logging: {} }
-      })
-      for (const action of mountedActions) {
-        server.registerTool(pascalCase(action.name), {
-          title: capitalCase(action.name),
-          description: action.description,
-          inputSchema: action.input
-        }, async (input, extra) => {
-          const logger = createLogger({
-            stream: process.stderr,
-            onLog: (level, data) => {
-              extra.sendNotification({ method: 'notifications/message', params: { level, data } })
-            },
-            onProgress: ({ progress, total, message }) => {
-              if (!extra._meta?.progressToken) { return }
-              extra.sendNotification({
-                method: 'notifications/progress',
-                params: {
-                  progress,
-                  total,
-                  message,
-                  progressToken: extra._meta.progressToken
-                }
-              })
-            }
-          })
-          const currentAuth = authStorage.getStore()
-          return action.run(input, context.fork({ logger, extra, ...(currentAuth ? { auth: currentAuth } : {}) })).then((result) => {
-            return toolResponse(result)
-          }).catch((error) => {
-            if (error instanceof Error) {
-              return toolResponse({ success: false, name: error.name, message: error.message, stack: error.stack })
-            } else {
-              return toolResponse({ success: false, name: 'Unknown Error', message: 'An unknown error occured', error })
-            }
-          })
-        })
-      }
-      return server
-    }
 
     app.get('/resource/:id', async (req: Request, res: Response) => {
       const id = req.params.id
@@ -155,124 +232,13 @@ export const http: AdapterFactory<HttpAdapterOptions> = ({ host, port, auth, ...
       res.send(buffer)
     })
 
-    app.post('/mcp', async (req: Request, res: Response) => {
-      const sessionId = req.headers['mcp-session-id'] as string | undefined
-      try {
-        let transport: StreamableHTTPServerTransport
-        if (sessionId && transports[sessionId]) {
-          transport = transports[sessionId]
-        } else if (isInitializeRequest(req.body)) {
-          const eventStore = new InMemoryEventStore()
-          transport = new StreamableHTTPServerTransport({
-            sessionIdGenerator: () => randomUUID(),
-            enableJsonResponse: false,
-            eventStore,
-            onsessioninitialized: (sId) => {
-              console.log(`Session initialized with ID: ${sId}`)
-              transports[sId] = transport
-            }
-          })
-          transport.onerror = (error) => {
-            console.error(error)
-          }
-          transport.onclose = () => {
-            const sid = transport.sessionId
-            if (sid && transports[sid]) {
-              console.log(`Transport closed for session ${sid}, removing from transports map`)
-              delete transports[sid]
-            }
-          }
-          await createServer().connect(transport)
-          await transport.handleRequest(req, res, req.body)
-          return
-        } else {
-          res.status(404).json({
-            jsonrpc: '2.0',
-            error: { code: -32_000, message: 'Session not found' },
-            id: null
-          })
-          return
-        }
-
-        // Handle the request with existing transport - no need to reconnect
-        // The existing transport is already connected to the server
-        await transport.handleRequest(req, res, req.body)
-      } catch (error) {
-        console.error('Error handling MCP request:', error)
-        if (!res.headersSent) {
-          res.status(500).json({
-            jsonrpc: '2.0',
-            error: { code: -32_603, message: 'Internal server error' },
-            id: null
-          })
-        }
-      }
-    })
-
-    app.get('/mcp', async (req: Request, res: Response) => {
-      const sessionId = req.headers['mcp-session-id'] as string | undefined
-      if (!sessionId || !transports[sessionId]) {
-        res.status(400).send('Invalid or missing session ID')
-        return
-      }
-
-      // Check for Last-Event-ID header for resumability
-      const lastEventId = req.headers['last-event-id'] as string | undefined
-      if (lastEventId) {
-        console.log(`Client reconnecting with Last-Event-ID: ${lastEventId}`)
-      } else {
-        console.log(`Establishing new SSE stream for session ${sessionId}`)
-      }
-
-      const transport = transports[sessionId]
-      await transport.handleRequest(req, res)
-    })
-
-    app.delete('/mcp', async (req: Request, res: Response) => {
-      const sessionId = req.headers['mcp-session-id'] as string | undefined
-      if (!sessionId || !transports[sessionId]) {
-        res.status(400).send('Invalid or missing session ID')
-        return
-      }
-
-      console.log(`Received session termination request for session ${sessionId}`)
-
-      try {
-        const transport = transports[sessionId]
-        await transport.handleRequest(req, res)
-      } catch (error) {
-        console.error('Error handling session termination:', error)
-        if (!res.headersSent) {
-          res.status(500).send('Error processing session termination')
-        }
-      }
-    })
-
-    app.get('/mcp/resource/:id', async (req: Request, res: Response) => {
-      const sessionId = req.headers['mcp-session-id'] as string | undefined
-      if (!sessionId || !transports[sessionId]) {
-        res.status(400).send('Invalid or missing session ID')
-        return
-      }
-
-      // Check for Last-Event-ID header for resumability
-      const lastEventId = req.headers['last-event-id'] as string | undefined
-      if (lastEventId) {
-        console.log(`Client reconnecting with Last-Event-ID: ${lastEventId}`)
-      } else {
-        console.log(`Establishing new SSE stream for session ${sessionId}`)
-      }
-
-      const transport = transports[sessionId]
-      await transport.handleRequest(req, res)
-    })
+    mountMcpTransport(app, transports, () => createMcpServer(options, mountedActions, context))
 
     let httpServer: Server | undefined
     return {
       context,
       start: async (actions) => {
         mountedActions = actions
-
         httpServer = app.listen(port, host, (error) => {
           if (error) {
             console.error('Failed to start server:', error)

@@ -76,6 +76,17 @@ MCP adapters (`stdio`, `http`) register actions as MCP tools using `PascalCase` 
 - After `git pull`, run `roam index` to keep the graph fresh.
 - For disambiguation, use `file:symbol` syntax: `roam symbol myfile:MyClass`.
 
+### Roam in Sub-Agents
+
+All `mcp__roam-code__*` tools are available inside sub-agents (both `general-purpose` and `Explore` types). When spawning a sub-agent for codebase exploration, include these instructions in the prompt:
+
+> Use `mcp__roam-code__*` MCP tools for codebase exploration. Prefer roam over
+> grep/glob/read — it understands symbols, call graphs, and architecture.
+> Key tools: `roam_understand` (overview), `roam_context` (files for a symbol),
+> `roam_search_symbol` (find by name), `roam_trace` (dependency paths),
+> `roam_file_info` (file structure), `roam_impact` (blast radius).
+> Use ToolSearch to find the full tool schemas before calling them.
+
 ## Code Style
 
 - ESM-only (`"type": "module"` in package.json)

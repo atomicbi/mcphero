@@ -15,6 +15,7 @@ const { adapter, handler } = vercel({
       `${process.env.BASE_URL!}/*`,
       'http://localhost:*',
       'http://127.0.0.1:*',
+      'https://app.mcpjam.com/*',
       'mcpjam://*'
     ],
     requiredScopes: ['openid', 'email'],

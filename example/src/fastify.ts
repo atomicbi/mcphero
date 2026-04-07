@@ -1,4 +1,5 @@
-import { fastify, mcphero } from '@mcphero/core'
+import { mcphero } from '@mcphero/core'
+import { fastify } from '@mcphero/fastify'
 import { HelloAction } from './actions/HelloAction.js'
 import { TaskAction } from './actions/TaskAction.js'
 

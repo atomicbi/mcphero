@@ -2,5 +2,6 @@ allowBuilds:
   esbuild: true
 packages:
   - "example"
+  - "demo/*"
   - "packages/*"
 linkWorkspacePackages: true

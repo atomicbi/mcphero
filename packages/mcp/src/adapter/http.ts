@@ -1,4 +1,5 @@
-import { Action, AdapterFactory, buildLogLevels, Logger, SideloadResource, toolResponse } from '@mcphero/core'
+import { Action, AdapterFactory, SideloadResource, toolResponse } from '@mcphero/core'
+import { createLogger } from '@mcphero/logger'
 import { InMemoryEventStore } from '@modelcontextprotocol/sdk/examples/shared/inMemoryEventStore.js'
 import { createMcpExpressApp, CreateMcpExpressAppOptions } from '@modelcontextprotocol/sdk/server/express.js'
 import { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js'
@@ -38,11 +39,12 @@ export const http: AdapterFactory<HttpAdapterOptions> = ({ host, port, ...mcpOpt
           description: action.description,
           inputSchema: action.input
         }, async (input, extra) => {
-          const logger: Logger = {
-            ...buildLogLevels((level, data) => {
+          const logger = createLogger({
+            stream: process.stderr,
+            onLog: (level, data) => {
               extra.sendNotification({ method: 'notifications/message', params: { level, data } })
-            }),
-            progress: ({ progress, total, message }) => {
+            },
+            onProgress: ({ progress, total, message }) => {
               if (!extra._meta?.progressToken) { return }
               extra.sendNotification({
                 method: 'notifications/progress',
@@ -54,7 +56,7 @@ export const http: AdapterFactory<HttpAdapterOptions> = ({ host, port, ...mcpOpt
                 }
               })
             }
-          }
+          })
           return action.run(input, context.fork({ logger, extra })).then((result) => {
             return toolResponse(result)
           }).catch((error) => {

@@ -1,10 +1,38 @@
-import { intro } from '@clack/prompts'
+/* eslint-disable @typescript-eslint/no-explicit-any */
+import { intro, log } from '@clack/prompts'
+import { Action, AdapterFactory, unwrap } from '@mcphero/core'
+import { createCLILogger } from '@mcphero/logger'
 import { camelCase, kebabCase } from 'change-case'
 import { Command } from 'commander'
 import z from 'zod'
-import { AdapterFactory } from '../util/adapter.js'
-import { buildCLILogger, handleCLIError, parseCLIInput } from '../util/cli.js'
-import { unwrap } from '../util/zod.js'
+
+function handleCLIError(error: unknown) {
+  if (error instanceof z.ZodError) {
+    log.error('Validation Error', { withGuide: false })
+    for (const issue of error.issues) {
+      log.error(`${issue.path}: ${issue.message}`)
+    }
+  } else if (error instanceof Error) {
+    log.error(error.message)
+  } else if (typeof error === 'string') {
+    log.error(error)
+  } else {
+    log.error(JSON.stringify(error))
+  }
+}
+
+function parseCLIInput(action: Action, args: any[]) {
+  const tmpArgs = args.slice(0, -1)
+  const rawInput = tmpArgs.pop()
+  action.args?.forEach((k, index) => { rawInput[k] = args[index] })
+  const { error, data } = action.input.safeParse(rawInput)
+  if (error || !data) {
+    handleCLIError(error)
+    process.exit()
+  }
+
+  return data
+}
 
 export const cli: AdapterFactory = () => {
   return (options, baseContext) => {
@@ -42,7 +70,7 @@ export const cli: AdapterFactory = () => {
             }
           }
           command.action((...args) => {
-            const logger = buildCLILogger()
+            const logger = createCLILogger()
             const input = parseCLIInput(action, args)
             intro(`${options.name} - ${action.name}`)
             action.run(input, context.fork({ logger, command })).then((result) => {

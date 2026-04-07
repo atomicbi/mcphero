@@ -25,6 +25,7 @@ MCPHero is a TypeScript toolkit that lets you define application logic as portab
 ## Table of Contents
 
 - [Why MCPHero](#why-mcphero)
+- [Packages](#packages)
 - [Quick Start](#quick-start)
 - [Core Concepts](#core-concepts)
   - [Actions](#actions)
@@ -60,12 +61,39 @@ Your action doesn't know or care which transport is running it.
 
 ---
 
+## Packages
+
+MCPHero is organized as a monorepo with modular packages. Install only what you need:
+
+| Package | npm | Description |
+|---------|-----|-------------|
+| `@mcphero/core` | [![npm](https://img.shields.io/npm/v/@mcphero/core)](https://www.npmjs.com/package/@mcphero/core) | Core library — actions, adapters, builder, context, logger, utilities |
+| `@mcphero/mcp` | [![npm](https://img.shields.io/npm/v/@mcphero/mcp)](https://www.npmjs.com/package/@mcphero/mcp) | MCP adapters — stdio, streamable HTTP, CLI proxy |
+| `@mcphero/cli` | [![npm](https://img.shields.io/npm/v/@mcphero/cli)](https://www.npmjs.com/package/@mcphero/cli) | CLI adapter — commander + clack terminal UI |
+| `@mcphero/fastify` | [![npm](https://img.shields.io/npm/v/@mcphero/fastify)](https://www.npmjs.com/package/@mcphero/fastify) | Fastify REST adapter — auto-generated OpenAPI/Swagger docs |
+
+**`@mcphero/core`** is always required. Then add the adapter packages for the transports you need:
+
+```bash
+# MCP server (stdio or HTTP)
+pnpm add @mcphero/core @mcphero/mcp
+
+# REST API with Swagger
+pnpm add @mcphero/core @mcphero/fastify
+
+# CLI tool
+pnpm add @mcphero/core @mcphero/cli
+
+# All of the above
+pnpm add @mcphero/core @mcphero/mcp @mcphero/cli @mcphero/fastify
+```
+
+---
+
 ## Quick Start
 
 ```bash
-npm install mcphero
-# or
-pnpm add mcphero
+pnpm add @mcphero/core @mcphero/mcp
 ```
 
 Create an action:
@@ -73,7 +101,7 @@ Create an action:
 ```typescript
 // actions/greet.ts
 import z from 'zod'
-import { createAction } from 'mcphero'
+import { createAction } from '@mcphero/core'
 
 export const GreetAction = createAction({
   name: 'greet',
@@ -94,12 +122,13 @@ Serve it as an MCP server:
 
 ```typescript
 // server.ts
-import { mcphero, stdio } from 'mcphero'
+import { mcphero } from '@mcphero/core'
+import { stdio } from '@mcphero/mcp'
 import { GreetAction } from './actions/greet.js'
 
 await mcphero({ name: 'my-server', description: 'My MCP Server', version: '1.0.0' })
-  .with(stdio())
-  .mount(GreetAction)
+  .adapter(stdio())
+  .action(GreetAction)
   .start()
 ```
 
@@ -115,7 +144,7 @@ An Action is the fundamental unit of logic in MCPHero. It is completely transpor
 
 ```typescript
 import z from 'zod'
-import { createAction } from 'mcphero'
+import { createAction } from '@mcphero/core'
 
 export const SearchAction = createAction({
   name: 'search',
@@ -142,14 +171,16 @@ export const SearchAction = createAction({
 | `description` | `string` | Human-readable description. Shown in MCP tool listings, CLI help, and Swagger docs. |
 | `input` | `z.ZodObject` | A Zod object schema defining the input. `.describe()` on each field provides per-field documentation across all adapters. |
 | `args` | `(keyof I)[]` | *(Optional)* Fields to expose as positional CLI arguments instead of `--options`. Only relevant for the CLI adapter. |
-| `run` | `(input, context) => Promise<O>` | The implementation. Receives validated input and an `ActionContext` with a `logger`. Returns any object — adapters handle serialization. |
+| `run` | `(input, context) => Promise<O>` | The implementation. Receives validated input and an `MCPHeroContext` with a `logger`. Returns any object — adapters handle serialization. |
 
 ### Adapters
 
 Adapters are the bridge between your actions and the outside world. Each adapter is a factory function that takes configuration and returns a generator compatible with the MCPHero builder.
 
 ```typescript
-import { stdio, http, fastify, cli } from 'mcphero'
+import { stdio, http } from '@mcphero/mcp'
+import { fastify } from '@mcphero/fastify'
+import { cli } from '@mcphero/cli'
 
 // No config needed
 stdio()
@@ -176,6 +207,9 @@ The adapter lifecycle:
 The builder provides a fluent, chainable API:
 
 ```typescript
+import { mcphero } from '@mcphero/core'
+import { stdio, http } from '@mcphero/mcp'
+
 const app = mcphero({
   name: 'my-toolkit',
   description: 'A collection of useful tools',
@@ -183,15 +217,15 @@ const app = mcphero({
 })
 
 app
-  .with(stdio())               // Add an adapter
-  .with(http({ ... }))         // Add another — they run in parallel
-  .mount(SearchAction)         // Mount an action
-  .mount(GreetAction)          // Mount another
+  .adapter(stdio())              // Add an adapter
+  .adapter(http({ ... }))        // Add another — they run in parallel
+  .action(SearchAction)          // Mount an action
+  .action(GreetAction)           // Mount another
 
-await app.start()              // Start all adapters concurrently
+await app.start()                // Start all adapters concurrently
 ```
 
-`.with()` and `.mount()` return the same instance, so you can chain freely. `.start()` launches all adapters in parallel via `Promise.all`.
+`.adapter()` and `.action()` return the same instance, so you can chain freely. `.start()` launches all adapters in parallel via `Promise.all`.
 
 ---
 
@@ -202,11 +236,12 @@ await app.start()              // Start all adapters concurrently
 The standard MCP transport for local tool servers. Communicates over stdin/stdout using the MCP protocol.
 
 ```typescript
-import { mcphero, stdio } from 'mcphero'
+import { mcphero } from '@mcphero/core'
+import { stdio } from '@mcphero/mcp'
 
 await mcphero({ name: 'my-tools', description: 'My Tools', version: '1.0.0' })
-  .with(stdio())
-  .mount(MyAction)
+  .adapter(stdio())
+  .action(MyAction)
   .start()
 ```
 
@@ -240,15 +275,16 @@ MCP logging notifications are wired automatically — `logger.info("message")` i
 A session-based MCP transport over HTTP with Server-Sent Events (SSE) for streaming. Supports multiple concurrent sessions, resumability via `Last-Event-ID`, and session termination.
 
 ```typescript
-import { mcphero, http } from 'mcphero'
+import { mcphero } from '@mcphero/core'
+import { http } from '@mcphero/mcp'
 
 await mcphero({ name: 'my-tools', description: 'My Tools', version: '1.0.0' })
-  .with(http({
+  .adapter(http({
     host: 'localhost',
     port: 8080,
     allowedHosts: ['localhost']
   }))
-  .mount(MyAction)
+  .action(MyAction)
   .start()
 ```
 
@@ -277,16 +313,17 @@ CORS is configured out of the box, exposing MCP-specific headers (`Mcp-Session-I
 Turns your actions into a REST API with auto-generated OpenAPI documentation and an interactive Swagger UI powered by Scalar.
 
 ```typescript
-import { mcphero, fastify } from 'mcphero'
+import { mcphero } from '@mcphero/core'
+import { fastify } from '@mcphero/fastify'
 
 await mcphero({ name: 'my-api', description: 'My REST API', version: '1.0.0' })
-  .with(fastify({
+  .adapter(fastify({
     host: 'localhost',
     port: 8080,
     logger: true
   }))
-  .mount(SearchAction)
-  .mount(GreetAction)
+  .action(SearchAction)
+  .action(GreetAction)
   .start()
 ```
 
@@ -322,12 +359,13 @@ fastify({
 Transforms your actions into a complete command-line application with help text, option parsing, and styled terminal output via clack.
 
 ```typescript
-import { mcphero, cli } from 'mcphero'
+import { mcphero } from '@mcphero/core'
+import { cli } from '@mcphero/cli'
 
 await mcphero({ name: 'mytool', description: 'My CLI Tool', version: '1.0.0' })
-  .with(cli())
-  .mount(GreetAction)
-  .mount(SearchAction)
+  .adapter(cli())
+  .action(GreetAction)
+  .action(SearchAction)
   .start()
 ```
 
@@ -400,12 +438,16 @@ run: async (input, { logger }) => {
 Run an MCP server and a REST API from the same set of actions:
 
 ```typescript
+import { mcphero } from '@mcphero/core'
+import { stdio } from '@mcphero/mcp'
+import { fastify } from '@mcphero/fastify'
+
 await mcphero({ name: 'my-platform', description: 'Multi-transport', version: '1.0.0' })
-  .with(stdio())
-  .with(fastify({ host: 'localhost', port: 8080, logger: true }))
-  .mount(SearchAction)
-  .mount(GreetAction)
-  .mount(AnalyzeAction)
+  .adapter(stdio())
+  .adapter(fastify({ host: 'localhost', port: 8080, logger: true }))
+  .action(SearchAction)
+  .action(GreetAction)
+  .action(AnalyzeAction)
   .start()
 ```
 
@@ -540,6 +582,8 @@ http://localhost:8080/mcp
 Creates a new MCPHero builder instance.
 
 ```typescript
+import { mcphero } from '@mcphero/core'
+
 function mcphero(options: MCPHeroOptions): MCPHero
 
 interface MCPHeroOptions {
@@ -549,9 +593,10 @@ interface MCPHeroOptions {
 }
 
 interface MCPHero {
-  with(generator: AdapterGenerator): MCPHero   // Add an adapter
-  mount(action: Action): MCPHero               // Mount an action
-  start(): Promise<MCPHero>                    // Start all adapters
+  adapter(generator: AdapterGenerator): MCPHero  // Add an adapter
+  action(action: Action): MCPHero                // Mount an action
+  actions(actions: Action[]): MCPHero            // Mount multiple actions
+  start(): Promise<MCPHero>                      // Start all adapters
 }
 ```
 
@@ -560,6 +605,8 @@ interface MCPHero {
 Type-safe action factory. Returns the action object as-is with full type inference.
 
 ```typescript
+import { createAction } from '@mcphero/core'
+
 function createAction<I extends object, O extends object>(
   action: Action<I, O>
 ): Action<I, O>
@@ -569,11 +616,8 @@ interface Action<I, O> {
   description: string
   input: z.ZodType<I> & { shape: Record<string, z.ZodTypeAny> }
   args?: (keyof I)[]
-  run: (input: I, context: ActionContext) => Promise<O>
-}
-
-interface ActionContext {
-  logger: Logger
+  isEnabled?: (context: MCPHeroContext) => boolean
+  run: (input: I, context: MCPHeroContext) => Promise<O>
 }
 ```
 
@@ -602,10 +646,12 @@ interface ProgressOptions {
 ### Adapter Factories
 
 ```typescript
-// MCP over stdin/stdout
+// MCP over stdin/stdout — from @mcphero/mcp
+import { stdio } from '@mcphero/mcp'
 function stdio(): AdapterFactory
 
-// MCP Streamable HTTP
+// MCP Streamable HTTP — from @mcphero/mcp
+import { http } from '@mcphero/mcp'
 function http(options: HttpAdapterOptions): AdapterFactory
 interface HttpAdapterOptions {
   host: string
@@ -613,7 +659,8 @@ interface HttpAdapterOptions {
   // ...plus CreateMcpExpressAppOptions (e.g., allowedHosts)
 }
 
-// Fastify REST API with Swagger
+// Fastify REST API with Swagger — from @mcphero/fastify
+import { fastify } from '@mcphero/fastify'
 function fastify(options: FastifyAdapterOptions): AdapterFactory
 interface FastifyAdapterOptions {
   host?: string
@@ -621,7 +668,8 @@ interface FastifyAdapterOptions {
   // ...plus all FastifyHttpOptions (logger, connectionTimeout, etc.)
 }
 
-// CLI via commander + clack
+// CLI via commander + clack — from @mcphero/cli
+import { cli } from '@mcphero/cli'
 function cli(): AdapterFactory
 ```
 
@@ -633,20 +681,17 @@ function cli(): AdapterFactory
 # Install dependencies
 pnpm install
 
-# Build
+# Build all packages
 pnpm build
 
-# Build in watch mode
-pnpm watch
-
-# Type-check
-pnpm typecheck
-
-# Lint
-pnpm lint
-
-# Lint + typecheck
+# Lint + typecheck all packages
 pnpm check
+
+# Run example servers
+pnpm tsx example/src/stdio.ts    # MCP stdio server
+pnpm tsx example/src/http.ts     # MCP streamable HTTP server on :8080
+pnpm tsx example/src/fastify.ts  # Fastify REST API with Swagger on :8080
+pnpm tsx example/src/cli.ts      # CLI mode
 ```
 
 Requires Node.js >= 18.

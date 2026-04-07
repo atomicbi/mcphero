@@ -1,4 +1,5 @@
-import { createAction, createSideloadResource, Logger } from '@mcphero/core'
+import { createAction, createSideloadResource } from '@mcphero/core'
+import { Logger } from '@mcphero/logger'
 import z from 'zod'
 
 export const TaskAction = createAction({

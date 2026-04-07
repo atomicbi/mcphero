@@ -1,5 +1,6 @@
 import { intro } from '@clack/prompts'
-import { AdapterFactory, buildCLILogger, parseToolResponse, ToolResponse, unwrap } from '@mcphero/core'
+import { AdapterFactory, parseToolResponse, ToolResponse, unwrap } from '@mcphero/core'
+import { createCLILogger } from '@mcphero/logger'
 import { Client } from '@modelcontextprotocol/sdk/client'
 import { StreamableHTTPClientTransport } from '@modelcontextprotocol/sdk/client/streamableHttp.js'
 import { LoggingMessageNotificationSchema, ProgressNotificationSchema } from '@modelcontextprotocol/sdk/types'
@@ -59,7 +60,7 @@ export const cliProxy: AdapterFactory<CliProxyOptions> = ({ url }) => {
           }
           command.action(async (args) => {
             const { silent } = program.opts<{ silent: boolean }>()
-            const logger = buildCLILogger()
+            const logger = createCLILogger()
             if (!silent) {
               intro(`${options.name} - ${tool.name}`)
               client.setNotificationHandler(LoggingMessageNotificationSchema, ({ params: { level, data } }) => {

@@ -1,0 +1,16 @@
+{
+  "name": "@mcphero/demo-vercel",
+  "version": "0.0.0",
+  "private": true,
+  "type": "module",
+  "dependencies": {
+    "@mcphero/core": "workspace:*",
+    "@mcphero/logger": "workspace:*",
+    "@mcphero/vercel": "workspace:*",
+    "zod": "^4.3.6"
+  },
+  "devDependencies": {
+    "@types/node": "^22.0.0",
+    "typescript": "^5.9.3"
+  }
+}

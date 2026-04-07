@@ -1,7 +1,20 @@
+import { AdapterFactory } from '@mcphero/core'
+import { buildLogLevels, Logger, LogLevel } from '@mcphero/logger'
 import { FastifyBaseLogger, FastifyHttpOptions, fastify as fastifyInstance } from 'fastify'
 import { Server } from 'http'
-import { AdapterFactory } from '../util/adapter.js'
-import { Logger } from '../util/logger.js'
+
+type FastifyLogLevel = 'fatal' | 'error' | 'warn' | 'info' | 'debug' | 'trace'
+
+const PINO_LEVEL_MAP: Record<LogLevel, FastifyLogLevel> = {
+  emergency: 'fatal',
+  alert: 'fatal',
+  critical: 'fatal',
+  error: 'error',
+  warning: 'warn',
+  notice: 'debug',
+  info: 'info',
+  debug: 'debug'
+}
 
 export interface FastifyAdapterOptions extends FastifyHttpOptions<Server, FastifyBaseLogger> {
   host?: string
@@ -41,14 +54,10 @@ export const fastify: AdapterFactory<FastifyAdapterOptions> = ({ host, port, ...
             }
           }, (request) => {
             const logger: Logger = {
-              error: (data) => { instance.log.error(data) },
-              debug: (data) => { instance.log.debug(data) },
-              info: (data) => { instance.log.info(data) },
-              notice: (data) => { instance.log.debug(data) },
-              warning: (data) => { instance.log.warn(data) },
-              critical: (data) => { instance.log.fatal(data) },
-              alert: (data) => { instance.log.error(data) },
-              emergency: (data) => { instance.log.fatal(data) },
+              ...buildLogLevels((level, data) => {
+                const pinoLevel = PINO_LEVEL_MAP[level] ?? 'info'
+                instance.log[pinoLevel](data)
+              }),
               progress: ({ progress, total, message }) => { instance.log.trace({ progress, total }, message) }
             }
             return action.run(request.body, context.fork({ logger, request }))

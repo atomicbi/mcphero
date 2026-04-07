@@ -1,4 +1,5 @@
-import { createAction, Logger } from '@mcphero/core'
+import { createAction } from '@mcphero/core'
+import { Logger } from '@mcphero/logger'
 import z from 'zod'
 
 export const AdminAction = createAction({

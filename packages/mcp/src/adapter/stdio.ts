@@ -1,6 +1,5 @@
-import { AdapterFactory } from '@mcphero/core/src/util/adapter.js'
-import { buildLogLevels, Logger } from '@mcphero/core/src/util/logger.js'
-import { toolResponse } from '@mcphero/core/src/util/mcp.js'
+import { AdapterFactory, toolResponse } from '@mcphero/core'
+import { createLogger } from '@mcphero/logger'
 import { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js'
 import { StdioServerTransport } from '@modelcontextprotocol/sdk/server/stdio.js'
 import { capitalCase, pascalCase } from 'change-case'
@@ -24,11 +23,12 @@ export const stdio: AdapterFactory = () => {
             description: action.description,
             inputSchema: action.input
           }, async (input, extra) => {
-            const logger: Logger = {
-              ...buildLogLevels((level, data) => {
+            const logger = createLogger({
+              stream: false,
+              onLog: (level, data) => {
                 extra.sendNotification({ method: 'notifications/message', params: { level, data } })
-              }),
-              progress: ({ progress, total, message }) => {
+              },
+              onProgress: ({ progress, total, message }) => {
                 if (!extra._meta?.progressToken) { return }
                 extra.sendNotification({
                   method: 'notifications/progress',
@@ -40,7 +40,7 @@ export const stdio: AdapterFactory = () => {
                   }
                 })
               }
-            }
+            })
             return action.run(input, context.fork({ logger, extra })).then((result) => {
               return toolResponse(result)
             }).catch((error) => {

@@ -1,4 +1,5 @@
-import { cli, mcphero } from '@mcphero/core'
+import { cli } from '@mcphero/cli'
+import { mcphero } from '@mcphero/core'
 import { AdminAction } from './actions/AdminAction.js'
 import { HelloAction } from './actions/HelloAction.js'
 import { TaskAction } from './actions/TaskAction.js'

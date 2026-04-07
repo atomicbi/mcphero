@@ -9,19 +9,17 @@ MCPHero is a TypeScript toolkit for building MCP (Model Context Protocol) server
 ## Commands
 
 ```bash
-pnpm build          # Build with tsup (ESM output to build/)
-pnpm watch          # Build in watch mode
-pnpm typecheck      # Type-check without emitting
-pnpm lint           # ESLint
-pnpm check          # Lint + typecheck
+pnpm build          # Build all packages with tsup (ESM output to build/)
+pnpm check          # Lint + typecheck all packages
+pnpm clean          # Clean all build outputs and turbo cache
 
-# Run test servers (not automated tests — these start live servers)
-pnpm tsx test/stdio.ts    # MCP stdio server
-pnpm tsx test/http.ts     # MCP streamable HTTP server on :8080
-pnpm tsx test/fastify.ts  # Fastify REST API with Swagger on :8080
-pnpm tsx test/cli.ts      # CLI mode
+# Run example servers (not automated tests — these start live servers)
+pnpm tsx example/src/stdio.ts    # MCP stdio server
+pnpm tsx example/src/http.ts     # MCP streamable HTTP server on :8080
+pnpm tsx example/src/fastify.ts  # Fastify REST API with Swagger on :8080
+pnpm tsx example/src/cli.ts      # CLI mode
 
-# MCP Inspector (connects to test/stdio.ts via .mcp.json)
+# MCP Inspector (connects to example stdio via .mcp.json)
 pnpm mcp
 ```
 
@@ -29,26 +27,51 @@ pnpm mcp
 
 The core pattern is **Action → Adapter → MCPHero**:
 
-- **Action** (`src/util/action.ts`): A named operation with a Zod input schema and an async `run(input, context)` function. Actions are adapter-agnostic — they receive a `Logger` via context.
-- **Adapter** (`src/util/adapter.ts`): Translates actions into a specific transport. `AdapterFactory<T>` takes config options, returns an `AdapterGenerator` that takes `MCPHeroOptions` and produces an `Adapter` with `start(actions)` / `stop()`.
-- **MCPHero** (`src/lib/mcphero.ts`): Fluent builder — `mcphero(opts).with(adapter).mount(action).start()`.
+- **Action** (`packages/core/src/util/action.ts`): A named operation with a Zod input schema and an async `run(input, context)` function. Actions are adapter-agnostic — they receive a `Logger` via context.
+- **Adapter** (`packages/core/src/util/adapter.ts`): Translates actions into a specific transport. `AdapterFactory<T>` takes config options, returns an `AdapterGenerator` that takes `MCPHeroOptions` and produces an `Adapter` with `start(actions)` / `stop()`.
+- **MCPHero** (`packages/core/src/lib/mcphero.ts`): Fluent builder — `mcphero(opts).adapter(generator).action(action).start()`.
+
+### Packages
+
+| Package | Path | Description |
+|---------|------|-------------|
+| `@mcphero/core` | `packages/core` | Core library — actions, adapters, builder, context, logger, utilities |
+| `@mcphero/mcp` | `packages/mcp` | MCP adapters — stdio, streamable HTTP, CLI proxy |
+| `@mcphero/cli` | `packages/cli` | CLI adapter — commander + clack terminal UI |
+| `@mcphero/fastify` | `packages/fastify` | Fastify REST adapter — auto-generated OpenAPI/Swagger docs |
+| `@mcphero/vercel` | `packages/vercel` | Vercel serverless adapter — stateless MCP over Streamable HTTP |
+| `@mcphero/examples` | `example` | Example usage of all adapters |
 
 ### Adapters
 
-| Adapter | File | Transport |
-|---------|------|-----------|
-| `stdio` | `src/adapter/stdio.ts` | MCP over stdin/stdout (`StdioServerTransport`) |
-| `http` | `src/adapter/http.ts` | MCP Streamable HTTP (`express` + session management) |
-| `fastify` | `src/adapter/fastify.ts` | REST API with Swagger UI via `@scalar/fastify-api-reference` |
-| `cli` | `src/adapter/cli.ts` | CLI via `commander` with `@clack/prompts` output |
+| Adapter | Package | File | Transport |
+|---------|---------|------|-----------|
+| `stdio` | `@mcphero/mcp` | `packages/mcp/src/adapter/stdio.ts` | MCP over stdin/stdout (`StdioServerTransport`) |
+| `http` | `@mcphero/mcp` | `packages/mcp/src/adapter/http.ts` | MCP Streamable HTTP (`express` + session management) |
+| `cliProxy` | `@mcphero/mcp` | `packages/mcp/src/adapter/cliProxy.ts` | MCP CLI proxy client (`commander` + `StreamableHTTPClientTransport`) |
+| `fastify` | `@mcphero/fastify` | `packages/fastify/src/adapter/fastify.ts` | REST API with Swagger UI via `@scalar/fastify-api-reference` |
+| `cli` | `@mcphero/cli` | `packages/cli/src/adapter/cli.ts` | CLI via `commander` with `@clack/prompts` output |
+| `vercel` | `@mcphero/vercel` | `packages/vercel/src/adapter/vercel.ts` | Stateless MCP Streamable HTTP (`WebStandardStreamableHTTPServerTransport`) |
 
 MCP adapters (`stdio`, `http`) register actions as MCP tools using `PascalCase` names. The CLI adapter uses `kebab-case` for commands and maps Zod types to CLI options/arguments.
 
-### Key Utilities
+### Key Utilities (in @mcphero/core)
 
-- `unwrap()` in `src/util/zod.ts` — recursively unwraps Zod wrapper types (optional, nullable, default, readonly) to get the base type and metadata. Used by the CLI adapter for option generation.
-- `toolResponse()` in `src/util/mcp.ts` — wraps any object as MCP `TextContent` JSON.
-- `buildLogLevels()` in `src/util/logger.ts` — builds a log-level record from a single callback function.
+- `unwrap()` in `packages/core/src/util/zod.ts` — recursively unwraps Zod wrapper types (optional, nullable, default, readonly) to get the base type and metadata. Used by the CLI adapter for option generation.
+- `toolResponse()` in `packages/core/src/util/mcp.ts` — wraps any object as MCP `TextContent` JSON.
+- `buildLogLevels()` in `packages/core/src/util/logger.ts` — builds a log-level record from a single callback function.
+- `buildCLILogger()` / `parseCLIInput()` / `handleCLIError()` in `packages/core/src/util/cli.ts` — CLI logging and input parsing utilities shared by `@mcphero/cli` and `@mcphero/mcp`'s cliProxy.
+
+## Tooling
+
+> Make sure to use the `roam` MCP server and skill (in this repository) when exploring the codebase.
+
+- One `roam` command replaces 5-10 grep/read cycles. Always try roam first.
+- Use `roam search` instead of grep/glob for finding symbols — it understands
+  definitions vs. usage and ranks by importance.
+- `roam context` gives exact line ranges — more precise than reading whole files.
+- After `git pull`, run `roam index` to keep the graph fresh.
+- For disambiguation, use `file:symbol` syntax: `roam symbol myfile:MyClass`.
 
 ## Code Style
 

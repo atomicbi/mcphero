@@ -7,6 +7,9 @@
     "directory": "demo/vercel"
   },
   "type": "module",
+  "scripts": {
+    "build": "astro build"
+  },
   "dependencies": {
     "@mcphero/auth": "workspace:*",
     "@mcphero/core": "workspace:*",
@@ -18,6 +21,7 @@
   },
   "devDependencies": {
     "@types/node": "^22.0.0",
+    "astro": "^5.10.2",
     "typescript": "^5.9.3"
   }
 }

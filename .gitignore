@@ -4,6 +4,8 @@ build/
 resources/
 *.tsbuildinfo
 .turbo
+.astro
+dist/
 .DS_Store
 .env
 store.json

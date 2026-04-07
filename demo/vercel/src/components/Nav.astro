@@ -1,0 +1,87 @@
+---
+---
+
+<nav>
+  <div class="container nav-inner">
+    <a href="/" class="logo">
+      <span class="logo-icon">&#9889;</span>
+      <span class="logo-text">MCPHero</span>
+    </a>
+    <div class="nav-links">
+      <a href="#how-it-works">How it works</a>
+      <a href="#adapters">Adapters</a>
+      <a href="#features">Features</a>
+      <a href="https://github.com/atomicbi/mcphero" target="_blank" rel="noopener" class="nav-github">
+        GitHub
+        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+          <path d="M7 17L17 7M17 7H7M17 7V17" />
+        </svg>
+      </a>
+    </div>
+  </div>
+</nav>
+
+<style>
+  nav {
+    position: fixed;
+    top: 0;
+    left: 0;
+    right: 0;
+    z-index: 100;
+    background: rgba(10, 10, 15, 0.85);
+    backdrop-filter: blur(12px);
+    border-bottom: 1px solid var(--border);
+  }
+
+  .nav-inner {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    height: 3.5rem;
+  }
+
+  .logo {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    color: var(--text);
+    font-weight: 700;
+    font-size: 1.05rem;
+  }
+
+  .logo:hover {
+    color: var(--text);
+  }
+
+  .logo-icon {
+    font-size: 1.2rem;
+  }
+
+  .nav-links {
+    display: flex;
+    align-items: center;
+    gap: 1.5rem;
+    font-size: 0.875rem;
+  }
+
+  .nav-links a {
+    color: var(--text-muted);
+    transition: color 0.15s;
+  }
+
+  .nav-links a:hover {
+    color: var(--text);
+  }
+
+  .nav-github {
+    display: flex;
+    align-items: center;
+    gap: 0.35rem;
+  }
+
+  @media (max-width: 640px) {
+    .nav-links a:not(.nav-github) {
+      display: none;
+    }
+  }
+</style>

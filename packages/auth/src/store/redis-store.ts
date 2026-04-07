@@ -1,7 +1,7 @@
 import type { OAuthStore } from '../provider/store.js'
 
 export interface RedisClient {
-  get(key: string): Promise<string | null>
+  get(key: string): Promise<unknown>
   set(key: string, value: string, options?: { ex?: number }): Promise<unknown>
   del(key: string): Promise<unknown>
 }
@@ -33,7 +33,7 @@ export function createRedisStore(options: RedisStoreOptions): OAuthStore {
   async function load<T>(namespace: string, id: string): Promise<T | undefined> {
     const raw = await client.get(key(namespace, id))
     if (raw == null) { return undefined }
-    return JSON.parse(raw) as T
+    return (typeof raw === 'string' ? JSON.parse(raw) : raw) as T
   }
 
   async function remove(namespace: string, id: string) {

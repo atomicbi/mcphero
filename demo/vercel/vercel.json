@@ -5,10 +5,10 @@
   "buildCommand": "cd ../.. && pnpm build",
   "outputDirectory": "public",
   "rewrites": [
-    { "source": "/mcp", "destination": "/api/mcp" }
+    { "source": "/(.*)", "destination": "/api" }
   ],
   "functions": {
-    "api/mcp.ts": {
+    "api/index.ts": {
       "memory": 1024,
       "maxDuration": 60
     }

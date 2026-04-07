@@ -8,6 +8,7 @@
   },
   "type": "module",
   "dependencies": {
+    "@mcphero/auth": "workspace:*",
     "@mcphero/core": "workspace:*",
     "@mcphero/logger": "workspace:*",
     "@mcphero/vercel": "workspace:*",

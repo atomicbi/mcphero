@@ -17,4 +17,5 @@ export interface AuthConfig {
   authorizationServers?: string[]
   requiredScopes?: string[]
   provider?: OAuthProvider
+  callbackPath?: string
 }

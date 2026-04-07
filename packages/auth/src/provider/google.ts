@@ -35,6 +35,7 @@ export function google(options: GoogleOAuthOptions): AuthConfig {
     required: true,
     resourceUrl: options.resourceUrl,
     authorizationServers: [options.resourceUrl],
-    provider
+    provider,
+    callbackPath: options.callbackPath ?? '/auth/callback'
   }
 }

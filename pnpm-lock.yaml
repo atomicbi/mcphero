@@ -39,6 +39,9 @@ importers:
 
   demo/vercel:
     dependencies:
+      '@mcphero/auth':
+        specifier: workspace:*
+        version: link:../../packages/auth
       '@mcphero/core':
         specifier: workspace:*
         version: link:../../packages/core

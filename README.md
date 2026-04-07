@@ -11,13 +11,14 @@ MCPHero is a TypeScript toolkit that lets you define application logic as portab
                      │  + async run()       │
                      └──────────┬──────────┘
                                 │
-              ┌─────────────────┼─────────────────┐
-              │                 │                  │
-     ┌────────▼────────┐ ┌─────▼──────┐ ┌────────▼────────┐
-     │   MCP (stdio)   │ │  Fastify   │ │      CLI        │
-     │   MCP (http)    │ │  REST API  │ │   commander +   │
-     │                 │ │  + Swagger │ │   clack         │
-     └─────────────────┘ └────────────┘ └─────────────────┘
+         ┌──────────────┬───────┼───────┬──────────────┐
+         │              │       │       │              │
+  ┌──────▼──────┐ ┌─────▼─────┐ │ ┌─────▼──────┐ ┌────▼─────┐
+  │ MCP (stdio) │ │   Fastify │ │ │    CLI     │ │  Vercel  │
+  │ MCP (http)  │ │  REST API │ │ │ commander  │ │serverless│
+  │             │ │ + Swagger │ │ │  + clack   │ │  MCP     │
+  └─────────────┘ └───────────┘ │ └────────────┘ └──────────┘
+                                │
 ```
 
 ---
@@ -36,6 +37,7 @@ MCPHero is a TypeScript toolkit that lets you define application logic as portab
   - [MCP Streamable HTTP](#mcp-streamable-http)
   - [Fastify REST API](#fastify-rest-api)
   - [CLI](#cli)
+  - [Vercel Serverless](#vercel-serverless)
 - [Logging and Progress](#logging-and-progress)
 - [Advanced Patterns](#advanced-patterns)
   - [Multiple Adapters Simultaneously](#multiple-adapters-simultaneously)
@@ -71,6 +73,8 @@ MCPHero is organized as a monorepo with modular packages. Install only what you 
 | `@mcphero/mcp` | [![npm](https://img.shields.io/npm/v/@mcphero/mcp)](https://www.npmjs.com/package/@mcphero/mcp) | MCP adapters — stdio, streamable HTTP, CLI proxy |
 | `@mcphero/cli` | [![npm](https://img.shields.io/npm/v/@mcphero/cli)](https://www.npmjs.com/package/@mcphero/cli) | CLI adapter — commander + clack terminal UI |
 | `@mcphero/fastify` | [![npm](https://img.shields.io/npm/v/@mcphero/fastify)](https://www.npmjs.com/package/@mcphero/fastify) | Fastify REST adapter — auto-generated OpenAPI/Swagger docs |
+| `@mcphero/vercel` | [![npm](https://img.shields.io/npm/v/@mcphero/vercel)](https://www.npmjs.com/package/@mcphero/vercel) | Vercel serverless adapter — stateless MCP over Streamable HTTP |
+| `@mcphero/logger` | [![npm](https://img.shields.io/npm/v/@mcphero/logger)](https://www.npmjs.com/package/@mcphero/logger) | Logging utilities — pino, clack, and MCP notification support |
 
 **`@mcphero/core`** is always required. Then add the adapter packages for the transports you need:
 
@@ -84,8 +88,11 @@ pnpm add @mcphero/core @mcphero/fastify
 # CLI tool
 pnpm add @mcphero/core @mcphero/cli
 
+# Vercel serverless MCP
+pnpm add @mcphero/core @mcphero/vercel
+
 # All of the above
-pnpm add @mcphero/core @mcphero/mcp @mcphero/cli @mcphero/fastify
+pnpm add @mcphero/core @mcphero/mcp @mcphero/cli @mcphero/fastify @mcphero/vercel
 ```
 
 ---
@@ -390,6 +397,54 @@ $ mytool greet --name "World" --enthusiastic
 ℹ HELLO, WORLD!!!
 ```
 
+### Vercel Serverless
+
+Deploy your actions as a stateless MCP server on Vercel. Each request creates a fresh server instance — no sessions, no persistent connections, fully compatible with serverless constraints.
+
+```typescript
+// api/mcp.ts (Vercel function)
+import { mcphero } from '@mcphero/core'
+import { vercel } from '@mcphero/vercel'
+import { SearchAction } from '../actions/search.js'
+
+const { adapter, handler } = vercel()
+
+await mcphero({ name: 'my-tools', description: 'My Tools', version: '1.0.0' })
+  .adapter(adapter)
+  .action(SearchAction)
+  .start()
+
+export default { fetch: handler }
+```
+
+The `vercel()` function returns a compound object — `adapter` wires into the MCPHero builder, while `handler`/`GET`/`POST`/`DELETE` are the request handler for your Vercel route.
+
+**For Next.js App Router** (`app/api/mcp/route.ts`):
+
+```typescript
+const { adapter, GET, POST, DELETE } = vercel()
+
+await mcphero({ name: 'my-tools', description: 'My Tools', version: '1.0.0' })
+  .adapter(adapter)
+  .action(SearchAction)
+  .start()
+
+export { GET, POST, DELETE }
+```
+
+**How it works:**
+
+- Uses `WebStandardStreamableHTTPServerTransport` from the MCP SDK in stateless mode (`sessionIdGenerator: undefined`)
+- Each request creates a fresh `McpServer` + transport, registers tools, handles the request, and returns a Web Standard `Response`
+- Logging goes to `process.stderr` (Vercel log drain) and MCP client notifications
+- No CORS handling — use Next.js middleware or `vercel.json` headers
+
+**`VercelAdapterOptions`:**
+
+| Option | Type | Default | Description |
+|--------|------|---------|-------------|
+| `enableJsonResponse` | `boolean` | `false` | Return JSON instead of SSE streams |
+
 ---
 
 ## Logging and Progress
@@ -671,6 +726,20 @@ interface FastifyAdapterOptions {
 // CLI via commander + clack — from @mcphero/cli
 import { cli } from '@mcphero/cli'
 function cli(): AdapterFactory
+
+// Vercel serverless — from @mcphero/vercel
+import { vercel } from '@mcphero/vercel'
+function vercel(options?: VercelAdapterOptions): VercelAdapter
+interface VercelAdapterOptions {
+  enableJsonResponse?: boolean
+}
+interface VercelAdapter {
+  adapter: AdapterGenerator          // Pass to mcphero().adapter()
+  handler: (req: Request) => Promise<Response>
+  GET: (req: Request) => Promise<Response>
+  POST: (req: Request) => Promise<Response>
+  DELETE: (req: Request) => Promise<Response>
+}
 ```
 
 ---

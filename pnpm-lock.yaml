@@ -76,6 +76,9 @@ importers:
       '@mcphero/mcp':
         specifier: workspace:*
         version: link:../packages/mcp
+      '@mcphero/vercel':
+        specifier: workspace:*
+        version: link:../packages/vercel
     devDependencies:
       '@eslint/js':
         specifier: ^10.0.1

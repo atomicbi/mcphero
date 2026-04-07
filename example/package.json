@@ -20,7 +20,8 @@
     "@mcphero/core": "workspace:*",
     "@mcphero/fastify": "workspace:*",
     "@mcphero/logger": "workspace:*",
-    "@mcphero/mcp": "workspace:*"
+    "@mcphero/mcp": "workspace:*",
+    "@mcphero/vercel": "workspace:*"
   },
   "devDependencies": {
     "@eslint/js": "^10.0.1",

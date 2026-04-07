@@ -80,3 +80,13 @@ MCP adapters (`stdio`, `http`) register actions as MCP tools using `PascalCase` 
 - Unused vars must be prefixed with `_`
 - Imports use `.js` extensions (NodeNext module resolution)
 - Zod v4 (`zod@^4.3.6`)
+
+## Wrapup Config
+
+- check: `pnpm check`
+- test: skip
+- push: yes
+- version_bump: yes (aligned across all packages)
+- publish: yes (manual — prompt to run `! pnpm publish:all`)
+- docs: per-package README.md + root CLAUDE.md as index
+- frontend_smoke: N/A

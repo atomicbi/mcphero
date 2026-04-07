@@ -5,3 +5,5 @@ resources/
 *.tsbuildinfo
 .turbo
 .DS_Store
+.env
+store.json

@@ -16,6 +16,7 @@
     "check": "pnpm lint && pnpm typecheck"
   },
   "dependencies": {
+    "@mcphero/auth": "workspace:*",
     "@mcphero/cli": "workspace:*",
     "@mcphero/core": "workspace:*",
     "@mcphero/fastify": "workspace:*",

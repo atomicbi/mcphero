@@ -4,48 +4,34 @@
     "type": "node",
     "request": "launch",
     "name": "test:cli",
-    "cwd": "${workspaceFolder}/packages/core",
+    "cwd": "${workspaceFolder}/example",
     "program": "${workspaceFolder}/node_modules/tsx/dist/cli.cjs",
-    "args": ["test/cli.ts"],
+    "args": ["src/cli.ts"],
     "outputCapture": "std"
-  }, {
-    "type": "node",
-    "request": "launch",
-    "name": "test:mcp",
-    "cwd": "${workspaceFolder}/packages/mcp",
-    "program": "${workspaceFolder}/node_modules/tsx/dist/cli.cjs",
-    "args": ["src/index.ts"],
-    "outputCapture": "std"
-  }, {
-    "type": "node",
-    "request": "launch",
-    "name": "test:cliProxy",
-    "cwd": "${workspaceFolder}/packages/core",
-    "program": "${workspaceFolder}/node_modules/tsx/dist/cli.cjs",
-    "args": ["test/cliProxy.ts", "task", "--meta", "{\"id\":\"8de36e60-83f8-4a48-bf45-7332b0540c52\",\"name\":\"Example\"}"],
-    "outputCapture": "std"
-  }, {
-    "type": "node",
-    "request": "launch",
-    "name": "test:stdio",
-    "cwd": "${workspaceFolder}/packages/core",
-    "program": "${workspaceFolder}/node_modules/@modelcontextprotocol/inspector/cli/build/cli.js",
-    "args": ["--config", ".mcp.json"]
   }, {
     "type": "node",
     "request": "launch",
     "name": "test:http",
-    "cwd": "${workspaceFolder}/packages/core",
+    "cwd": "${workspaceFolder}/example",
     "program": "${workspaceFolder}/node_modules/tsx/dist/cli.cjs",
-    "args": ["test/http.ts"],
+    "args": ["src/http.ts"],
     "outputCapture": "std"
   }, {
     "type": "node",
     "request": "launch",
-    "name": "test:fastify",
-    "cwd": "${workspaceFolder}/packages/core",
+    "name": "test:http-auth",
+    "cwd": "${workspaceFolder}/example",
     "program": "${workspaceFolder}/node_modules/tsx/dist/cli.cjs",
-    "args": ["test/fastify.ts"],
+    "args": ["src/http-auth.ts"],
     "outputCapture": "std"
+  }, {
+    "type": "node",
+    "request": "launch",
+    "name": "test:http-oauth",
+    "cwd": "${workspaceFolder}/example",
+    "program": "${workspaceFolder}/node_modules/tsx/dist/cli.cjs",
+    "args": ["src/http-oauth.ts"],
+    "outputCapture": "std",
+    "envFile": "${workspaceFolder}/.env"
   }]
 }

@@ -1,3 +1,4 @@
+import { AuthConfig, AuthInfo, generateProtectedResourceMetadata, OAuthRequest, OAuthResponse, validateToken } from '@mcphero/auth'
 import { Action, AdapterFactory, SideloadResource, toolResponse } from '@mcphero/core'
 import { createLogger } from '@mcphero/logger'
 import { InMemoryEventStore } from '@modelcontextprotocol/sdk/examples/shared/inMemoryEventStore.js'
@@ -8,20 +9,92 @@ import { isInitializeRequest } from '@modelcontextprotocol/sdk/types.js'
 import { capitalCase, pascalCase } from 'change-case'
 import cors from 'cors'
 import { randomUUID } from 'crypto'
-import { Request, Response } from 'express'
+import express, { Request, Response } from 'express'
 import { readFile } from 'fs/promises'
 import { Server } from 'http'
+import { AsyncLocalStorage } from 'node:async_hooks'
+
+const authStorage = new AsyncLocalStorage<AuthInfo>()
 
 export interface HttpAdapterOptions extends CreateMcpExpressAppOptions {
   host: string
   port: number
+  auth?: AuthConfig
 }
 
-export const http: AdapterFactory<HttpAdapterOptions> = ({ host, port, ...mcpOptions }) => {
+export const http: AdapterFactory<HttpAdapterOptions> = ({ host, port, auth, ...mcpOptions }) => {
   return (options, baseContext) => {
     const context = baseContext.fork({ adapter: 'http' })
     const app = createMcpExpressApp({ ...mcpOptions, host })
     app.use(cors({ exposedHeaders: ['WWW-Authenticate', 'Mcp-Session-Id', 'Last-Event-Id', 'Mcp-Protocol-Version'], origin: '*' }))
+
+    if (auth?.authorizationServers?.length && auth.resourceUrl) {
+      app.get('/.well-known/oauth-protected-resource', (_req: Request, res: Response) => {
+        const metadata = generateProtectedResourceMetadata(auth.resourceUrl!, auth.authorizationServers!)
+        res.json(metadata)
+      })
+    }
+
+    const oauthPaths = new Set<string>()
+    if (auth?.provider) {
+      const provider = auth.provider
+      const toOAuthReq = (req: Request): OAuthRequest => ({
+        method: req.method,
+        url: new URL(req.url, `${req.protocol}://${req.get('host')}`),
+        headers: Object.fromEntries(Object.entries(req.headers).map(([k, v]) => [k, Array.isArray(v) ? v[0] : v])),
+        body: req.body as Record<string, string> | undefined
+      })
+      const sendOAuth = (res: Response, oauthRes: OAuthResponse) => {
+        for (const [key, value] of Object.entries(oauthRes.headers)) { res.header(key, value) }
+        if (oauthRes.body) {
+          res.status(oauthRes.status).send(typeof oauthRes.body === 'string' ? oauthRes.body : JSON.stringify(oauthRes.body))
+        } else {
+          res.status(oauthRes.status).end()
+        }
+      }
+
+      oauthPaths.add('/.well-known/oauth-authorization-server')
+      oauthPaths.add('/authorize')
+      oauthPaths.add('/auth/callback')
+      oauthPaths.add('/token')
+      oauthPaths.add('/register')
+
+      app.get('/.well-known/oauth-authorization-server', (_req: Request, res: Response) => {
+        sendOAuth(res, provider.metadata())
+      })
+      app.get('/authorize', async (req: Request, res: Response) => {
+        sendOAuth(res, await provider.authorize(toOAuthReq(req)))
+      })
+      app.get('/auth/callback', async (req: Request, res: Response) => {
+        sendOAuth(res, await provider.callback(toOAuthReq(req)))
+      })
+      app.post('/token', express.urlencoded({ extended: false }), async (req: Request, res: Response) => {
+        sendOAuth(res, await provider.token(toOAuthReq(req)))
+      })
+      app.post('/register', express.json(), async (req: Request, res: Response) => {
+        sendOAuth(res, await provider.register(toOAuthReq(req)))
+      })
+    }
+
+    if (auth) {
+      app.use(async (req: Request, res: Response, next: (err?: unknown) => void) => {
+        if (req.path.startsWith('/.well-known/') || oauthPaths.has(req.path)) { return next() }
+        const result = await validateToken(req.headers.authorization, auth)
+        if (result.error) {
+          for (const [key, value] of Object.entries(result.error.headers)) {
+            res.header(key, value)
+          }
+          res.status(result.error.statusCode).json(result.error.body)
+          return
+        }
+        if (result.auth) {
+          authStorage.run(result.auth, () => { next() })
+        } else {
+          next()
+        }
+      })
+    }
+
     const transports: Record<string, StreamableHTTPServerTransport> = {}
     let mountedActions: Action[] = []
 
@@ -57,7 +130,8 @@ export const http: AdapterFactory<HttpAdapterOptions> = ({ host, port, ...mcpOpt
               })
             }
           })
-          return action.run(input, context.fork({ logger, extra })).then((result) => {
+          const currentAuth = authStorage.getStore()
+          return action.run(input, context.fork({ logger, extra, ...(currentAuth ? { auth: currentAuth } : {}) })).then((result) => {
             return toolResponse(result)
           }).catch((error) => {
             if (error instanceof Error) {
@@ -87,7 +161,7 @@ export const http: AdapterFactory<HttpAdapterOptions> = ({ host, port, ...mcpOpt
         let transport: StreamableHTTPServerTransport
         if (sessionId && transports[sessionId]) {
           transport = transports[sessionId]
-        } else if (!sessionId && isInitializeRequest(req.body)) {
+        } else if (isInitializeRequest(req.body)) {
           const eventStore = new InMemoryEventStore()
           transport = new StreamableHTTPServerTransport({
             sessionIdGenerator: () => randomUUID(),
@@ -112,9 +186,9 @@ export const http: AdapterFactory<HttpAdapterOptions> = ({ host, port, ...mcpOpt
           await transport.handleRequest(req, res, req.body)
           return
         } else {
-          res.status(400).json({
+          res.status(404).json({
             jsonrpc: '2.0',
-            error: { code: -32_000, message: 'Bad Request: No valid session ID provided' },
+            error: { code: -32_000, message: 'Session not found' },
             id: null
           })
           return

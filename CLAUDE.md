@@ -17,6 +17,8 @@ pnpm clean          # Clean all build outputs and turbo cache
 pnpm tsx example/src/stdio.ts    # MCP stdio server
 pnpm tsx example/src/http.ts     # MCP streamable HTTP server on :8080
 pnpm tsx example/src/fastify.ts  # Fastify REST API with Swagger on :8080
+pnpm tsx example/src/http-auth.ts # MCP HTTP with bearer token auth on :8080
+pnpm tsx example/src/http-oauth.ts # MCP HTTP with Google OAuth 2.1 on :8080
 pnpm tsx example/src/cli.ts      # CLI mode
 
 # MCP Inspector (connects to example stdio via .mcp.json)
@@ -36,6 +38,7 @@ The core pattern is **Action → Adapter → MCPHero**:
 | Package | Path | Description |
 |---------|------|-------------|
 | `@mcphero/core` | `packages/core` | Core library — actions, adapters, builder, context, logger, utilities |
+| `@mcphero/auth` | `packages/auth` | Auth — OAuth 2.1 proxy (PKCE, refresh tokens, CIMD, dynamic client registration), bearer token validation, protected resource metadata (RFC 9728). Standalone — only depends on `jose` |
 | `@mcphero/mcp` | `packages/mcp` | MCP adapters — stdio, streamable HTTP, CLI proxy |
 | `@mcphero/cli` | `packages/cli` | CLI adapter — commander + clack terminal UI |
 | `@mcphero/fastify` | `packages/fastify` | Fastify REST adapter — auto-generated OpenAPI/Swagger docs |
